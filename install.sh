@@ -41,16 +41,48 @@ else
 fi
 log "Using $PM ($(command -v "$PM"))"
 
-# ---------- clone or update ----------
-mkdir -p "$INSTALL_DIR"
-if [ -d "$INSTALL_DIR/.git" ]; then
-  log "Updating $INSTALL_DIR"
-  git -C "$INSTALL_DIR" fetch --quiet origin "$BRANCH"
-  git -C "$INSTALL_DIR" reset --hard --quiet "origin/$BRANCH"
-else
-  log "Cloning $REPO into $INSTALL_DIR"
-  git clone --quiet --branch "$BRANCH" "https://github.com/$REPO.git" "$INSTALL_DIR"
+# ---------- detect + remove any previous install ----------
+# A fresh install wipes everything in the install dir, symlinks, and the
+# skill. Runtime data in ~/.agentchat (identity, sqlite, web-token) is
+# preserved — otherwise users would lose their rooms on every update.
+prior_found=0
+[ -e "$INSTALL_DIR" ] && prior_found=1
+[ -e "$BIN_DIR/agentchat" ] || [ -L "$BIN_DIR/agentchat" ] && prior_found=1
+[ -e "$BIN_DIR/agentchat-mcp" ] || [ -L "$BIN_DIR/agentchat-mcp" ] && prior_found=1
+[ -f "$SKILL_DIR/SKILL.md" ] && prior_found=1
+
+if [ "$prior_found" -eq 1 ]; then
+  log "Existing install detected — removing before fresh install"
+  [ "${AGENTCHAT_KEEP_DATA:-1}" = "1" ] && \
+    log "  (runtime data at ~/.agentchat is preserved — set AGENTCHAT_KEEP_DATA=0 to wipe)"
+
+  # Unregister from Claude Code first so stale bin paths don't linger.
+  if [ "${AGENTCHAT_SKIP_MCP:-0}" != "1" ] && command -v claude >/dev/null 2>&1; then
+    if claude mcp list 2>/dev/null | grep -q '^agentchat'; then
+      log "  unregistering from Claude Code"
+      claude mcp remove agentchat >/dev/null 2>&1 || \
+        warn "  claude mcp remove failed — you may need to run it manually"
+    fi
+  fi
+
+  rm -rf "$INSTALL_DIR" \
+         "$BIN_DIR/agentchat" "$BIN_DIR/agentchat-mcp" \
+         "$SKILL_DIR/SKILL.md"
+  # Remove an empty skill dir so re-runs don't leave it behind.
+  [ -d "$SKILL_DIR" ] && rmdir "$SKILL_DIR" 2>/dev/null || true
+
+  if [ "${AGENTCHAT_KEEP_DATA:-1}" = "0" ]; then
+    # Respect AGENTCHAT_HOME override, fall back to default location.
+    AC_DATA="${AGENTCHAT_HOME:-$HOME/.agentchat}"
+    warn "wiping $AC_DATA (identity, sqlite, token) per AGENTCHAT_KEEP_DATA=0"
+    rm -rf "$AC_DATA"
+  fi
 fi
+
+# ---------- fresh clone ----------
+mkdir -p "$INSTALL_DIR"
+log "Cloning $REPO into $INSTALL_DIR"
+git clone --quiet --branch "$BRANCH" "https://github.com/$REPO.git" "$INSTALL_DIR"
 
 cd "$INSTALL_DIR"
 

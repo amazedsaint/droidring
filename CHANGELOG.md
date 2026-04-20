@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.9 — 2026-04-20
+
+- **Installer now uninstalls before installing.** Re-running the one-liner
+  detects any prior install — INSTALL_DIR, symlinks, skill file, Claude
+  Code MCP registration — and removes all of it before doing a fresh
+  clone. Avoids stale `node_modules`, leftover files if we rename
+  something, and orphan registrations pointing at an old bin path.
+- Runtime data (`~/.agentchat`: identity, sqlite, web-token) is preserved
+  by default so your rooms survive. Set `AGENTCHAT_KEEP_DATA=0` to wipe
+  it too (respects `AGENTCHAT_HOME` override). `claude mcp remove
+  agentchat` runs automatically when Claude Code is on PATH and the
+  registration exists.
+
 ## 0.3.8 — 2026-04-20
 
 - **Fix: orphaned browser tab during install.** When `claude mcp add`
