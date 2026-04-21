@@ -7,26 +7,26 @@ import { tryOpenBrowser } from './open-browser.js';
 /**
  * Runtime decision on how to surface the web UI once the server is up:
  *
- *   1. respect AGENTCHAT_WEB_OPEN=0 → do nothing (user has the URL)
+ *   1. respect DROINGRING_WEB_OPEN=0 → do nothing (user has the URL)
  *   2. SSH session                   → do nothing; user is on the terminal
  *   3. no display (Linux)            → do nothing
- *   4. AGENTCHAT_FORCE_BROWSER=1     → skip electron, go straight to browser
+ *   4. DROINGRING_FORCE_BROWSER=1     → skip electron, go straight to browser
  *   5. electron resolvable           → launch the Electron shell
  *   6. otherwise                     → open the default browser
  *
  * The Electron shell loads the same `http://127.0.0.1:7879/#token=…` URL, so
  * TUI / web / Electron are automatically on parity. Extras the shell adds:
  *   - native app name + about panel (not "Electron")
- *   - window state persistence in ~/.agentchat/electron-window.json
+ *   - window state persistence in ~/.droingring/electron-window.json
  *   - dock/taskbar badge driven by the web UI via a preload bridge
  *   - native notifications forwarded from the web UI
- *   - `agentchat://join/<ticket>` custom protocol for one-click invite links
+ *   - `droingring://join/<ticket>` custom protocol for one-click invite links
  *   - splash + retry when the server isn't quite up yet
  */
 
 export type ShellKind = 'electron' | 'browser' | 'none';
 
-const APP_NAME = 'agentchat';
+const APP_NAME = 'droingring';
 
 const ELECTRON_MAIN_JS = String.raw`
 'use strict';
@@ -36,8 +36,8 @@ const path = require('node:path');
 const os = require('node:os');
 
 const url = process.argv[process.argv.length - 1];
-const preloadPath = process.env.AGENTCHAT_PRELOAD || '';
-const appVersion = process.env.AGENTCHAT_VERSION || '0.0.0';
+const preloadPath = process.env.DROINGRING_PRELOAD || '';
+const appVersion = process.env.DROINGRING_VERSION || '0.0.0';
 
 // Preserve the token in the URL across navigations — the renderer never
 // needs to re-prompt because the hash already carries it.
@@ -45,17 +45,17 @@ const initialUrl = url;
 let mainWindow = null;
 let splashWindow = null;
 
-app.setName('agentchat');
+app.setName('droingring');
 app.setAboutPanelOptions({
-  applicationName: 'agentchat',
+  applicationName: 'droingring',
   applicationVersion: appVersion,
   credits: 'P2P end-to-end encrypted chat for agents and humans.',
 });
 
-// Custom protocol: agentchat://join/<ticket> — handed off to the renderer
+// Custom protocol: droingring://join/<ticket> — handed off to the renderer
 // via IPC when it's ready (or stashed until then).
 let pendingProtocolUrl = null;
-app.setAsDefaultProtocolClient('agentchat');
+app.setAsDefaultProtocolClient('droingring');
 
 // Single-instance lock — second launch focuses the first window instead of
 // opening a duplicate, and any protocol URL in argv[] is forwarded.
@@ -64,7 +64,7 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', (_event, argv) => {
-    const extra = argv.find((a) => a.startsWith('agentchat://'));
+    const extra = argv.find((a) => a.startsWith('droingring://'));
     if (extra) handleProtocolUrl(extra);
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
@@ -84,7 +84,7 @@ function handleProtocolUrl(raw) {
     const ticket = parsed.pathname.replace(/^\//, '') + (parsed.search || '');
     if (!ticket) return;
     if (mainWindow) {
-      mainWindow.webContents.send('agentchat:join-ticket', ticket);
+      mainWindow.webContents.send('droingring:join-ticket', ticket);
     } else {
       pendingProtocolUrl = ticket;
     }
@@ -94,7 +94,7 @@ function handleProtocolUrl(raw) {
 }
 
 // ---------- window state persistence ----------
-const stateFile = path.join(os.homedir(), '.agentchat', 'electron-window.json');
+const stateFile = path.join(os.homedir(), '.droingring', 'electron-window.json');
 function loadState() {
   try {
     const raw = fs.readFileSync(stateFile, 'utf8');
@@ -154,7 +154,7 @@ function showSplash() {
     '@keyframes p{0%,100%{opacity:.4}50%{opacity:1}}',
     '</style>',
     '<div class="card">',
-    '<div class="title">agentchat</div>',
+    '<div class="title">droingring</div>',
     '<div class="sub">connecting<span class="dot"></span></div>',
     '</div>',
   ].join('');
@@ -190,12 +190,12 @@ function buildMenu() {
         {
           label: 'New room…',
           accelerator: modAccel + '+N',
-          click() { mainWindow && mainWindow.webContents.send('agentchat:shortcut', 'new-room'); },
+          click() { mainWindow && mainWindow.webContents.send('droingring:shortcut', 'new-room'); },
         },
         {
           label: 'Join by ticket…',
           accelerator: modAccel + '+Shift+J',
-          click() { mainWindow && mainWindow.webContents.send('agentchat:shortcut', 'join'); },
+          click() { mainWindow && mainWindow.webContents.send('droingring:shortcut', 'join'); },
         },
         { type: 'separator' },
         { role: 'close' },
@@ -222,7 +222,7 @@ function buildMenu() {
         label: 'Room ' + (i + 1),
         accelerator: roomAccel(i + 1),
         click() {
-          mainWindow && mainWindow.webContents.send('agentchat:shortcut', 'room-' + (i + 1));
+          mainWindow && mainWindow.webContents.send('droingring:shortcut', 'room-' + (i + 1));
         },
       })),
     },
@@ -232,12 +232,12 @@ function buildMenu() {
       submenu: [
         { label: 'Open in browser', click() { shell.openExternal(initialUrl); } },
         {
-          label: 'About agentchat',
+          label: 'About droingring',
           click() {
             dialog.showMessageBox({
               type: 'info',
-              title: 'About agentchat',
-              message: 'agentchat',
+              title: 'About droingring',
+              message: 'droingring',
               detail:
                 'Version ' + appVersion + '\nP2P end-to-end encrypted chat.\n\n' +
                 'Window URL: ' + initialUrl,
@@ -260,7 +260,7 @@ function createWindow() {
     y: state.y,
     minWidth: 640,
     minHeight: 420,
-    title: 'agentchat',
+    title: 'droingring',
     backgroundColor: '#212121',
     show: false, // show after first paint to avoid a white flash
     autoHideMenuBar: process.platform !== 'darwin',
@@ -293,7 +293,7 @@ function createWindow() {
     closeSplash();
     mainWindow.show();
     if (pendingProtocolUrl) {
-      mainWindow.webContents.send('agentchat:join-ticket', pendingProtocolUrl);
+      mainWindow.webContents.send('droingring:join-ticket', pendingProtocolUrl);
       pendingProtocolUrl = null;
     }
   });
@@ -318,9 +318,9 @@ function createWindow() {
             '<!doctype html><meta charset=utf-8>' +
               '<style>html,body{background:#1f1f22;color:#ddd;font-family:sans-serif;' +
               'padding:40px;}a{color:#4ea3ff}</style>' +
-              '<h2>Cannot reach the agentchat server</h2>' +
+              '<h2>Cannot reach the droingring server</h2>' +
               '<p>Tried: <code>' + initialUrl + '</code></p>' +
-              '<p>Start it with <code>agentchat web</code>, then reload (Cmd/Ctrl+R).</p>',
+              '<p>Start it with <code>droingring web</code>, then reload (Cmd/Ctrl+R).</p>',
           ),
       );
       mainWindow.show();
@@ -329,7 +329,7 @@ function createWindow() {
 }
 
 // ---------- IPC bridge: renderer → main ----------
-ipcMain.on('agentchat:set-badge', (_event, count) => {
+ipcMain.on('droingring:set-badge', (_event, count) => {
   if (typeof count !== 'number' || count < 0) count = 0;
   if (process.platform === 'darwin') {
     app.dock && app.dock.setBadge(count > 0 ? String(count) : '');
@@ -338,8 +338,8 @@ ipcMain.on('agentchat:set-badge', (_event, count) => {
     try { app.setBadgeCount(count); } catch { /* not all platforms */ }
   }
 });
-ipcMain.on('agentchat:notify', (_event, payload) => {
-  const { title = 'agentchat', body = '' } = payload || {};
+ipcMain.on('droingring:notify', (_event, payload) => {
+  const { title = 'droingring', body = '' } = payload || {};
   if (!Notification.isSupported()) return;
   const n = new Notification({ title: String(title).slice(0, 200), body: String(body).slice(0, 400) });
   n.on('click', () => {
@@ -347,7 +347,7 @@ ipcMain.on('agentchat:notify', (_event, payload) => {
   });
   n.show();
 });
-ipcMain.on('agentchat:focus', () => {
+ipcMain.on('droingring:focus', () => {
   if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
 });
 
@@ -366,25 +366,25 @@ const ELECTRON_PRELOAD_JS = String.raw`
 'use strict';
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('agentchatShell', {
+contextBridge.exposeInMainWorld('droingringShell', {
   isElectron: true,
   setBadge(count) {
-    ipcRenderer.send('agentchat:set-badge', Number(count) | 0);
+    ipcRenderer.send('droingring:set-badge', Number(count) | 0);
   },
   notify(title, body) {
-    ipcRenderer.send('agentchat:notify', {
+    ipcRenderer.send('droingring:notify', {
       title: String(title || '').slice(0, 200),
       body: String(body || '').slice(0, 400),
     });
   },
   focus() {
-    ipcRenderer.send('agentchat:focus');
+    ipcRenderer.send('droingring:focus');
   },
   onShortcut(cb) {
-    ipcRenderer.on('agentchat:shortcut', (_e, name) => cb(name));
+    ipcRenderer.on('droingring:shortcut', (_e, name) => cb(name));
   },
   onJoinTicket(cb) {
-    ipcRenderer.on('agentchat:join-ticket', (_e, ticket) => cb(ticket));
+    ipcRenderer.on('droingring:join-ticket', (_e, ticket) => cb(ticket));
   },
 });
 `;
@@ -399,7 +399,7 @@ function hasDisplay(): boolean {
 }
 
 async function resolveElectron(): Promise<string | null> {
-  if (process.env.AGENTCHAT_FORCE_BROWSER === '1') return null;
+  if (process.env.DROINGRING_FORCE_BROWSER === '1') return null;
   try {
     // Optional runtime dep — dynamic specifier keeps TS from resolving types
     // at build time and keeps tsup from bundling electron into dist/.
@@ -413,8 +413,8 @@ async function resolveElectron(): Promise<string | null> {
 }
 
 export function writeElectronShellFiles(): { main: string; preload: string } {
-  const main = join(tmpdir(), `agentchat-electron-main-${process.pid}.cjs`);
-  const preload = join(tmpdir(), `agentchat-electron-preload-${process.pid}.cjs`);
+  const main = join(tmpdir(), `droingring-electron-main-${process.pid}.cjs`);
+  const preload = join(tmpdir(), `droingring-electron-preload-${process.pid}.cjs`);
   writeFileSync(main, ELECTRON_MAIN_JS);
   writeFileSync(preload, ELECTRON_PRELOAD_JS);
   return { main, preload };
@@ -429,7 +429,7 @@ export async function launchShell(
   url: string,
   opts: { version?: string } = {},
 ): Promise<ShellKind> {
-  if (process.env.AGENTCHAT_WEB_OPEN === '0') return 'none';
+  if (process.env.DROINGRING_WEB_OPEN === '0') return 'none';
   if (isOverSsh()) return 'none';
   if (!hasDisplay()) return 'none';
 
@@ -442,8 +442,8 @@ export async function launchShell(
         detached: true,
         env: {
           ...process.env,
-          AGENTCHAT_PRELOAD: preload,
-          AGENTCHAT_VERSION: opts.version || process.env.AGENTCHAT_VERSION || '0.0.0',
+          DROINGRING_PRELOAD: preload,
+          DROINGRING_VERSION: opts.version || process.env.DROINGRING_VERSION || '0.0.0',
           // Suppress Electron's own logging noise in the parent's stderr.
           ELECTRON_NO_ATTACH_CONSOLE: '1',
         },

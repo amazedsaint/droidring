@@ -240,8 +240,8 @@ export async function startWebServer(opts: WebServerOptions): Promise<WebServerH
     srv.listen(port, host);
   });
 
-  // Pick up rooms created by a sibling process (e.g. agentchat mcp running
-  // alongside agentchat web on the same identity). Every 5s the manager
+  // Pick up rooms created by a sibling process (e.g. droingring mcp running
+  // alongside droingring web on the same identity). Every 5s the manager
   // scans its sqlite for rooms it doesn't have in memory and rehydrates
   // them; the UI's own WS listeners fire from there. No-op when the DB
   // hasn't changed.

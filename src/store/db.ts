@@ -1,11 +1,11 @@
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { agentchatDir } from '../p2p/identity.js';
+import { droingringDir } from '../p2p/identity.js';
 
 export type DB = Database.Database;
 
 export function openDatabase(path?: string): DB {
-  const dbPath = path || join(agentchatDir(), 'store.db');
+  const dbPath = path || join(droingringDir(), 'store.db');
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
@@ -62,7 +62,7 @@ function migrate(db: DB): void {
       v TEXT NOT NULL
     );
 
-    -- Active local sessions — one row per running agentchat process
+    -- Active local sessions — one row per running droingring process
     -- (stdio MCP, HTTP MCP, web sidecar, TUI). All share the same identity
     -- (rows represent the same human, just different frontends/agents).
     -- Rows are removed on graceful shutdown and GC'd when last_seen is

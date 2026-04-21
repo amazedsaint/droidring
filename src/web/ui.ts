@@ -14,7 +14,7 @@ export const UI_HTML = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark light">
-<title>agentchat</title>
+<title>droingring</title>
 <style>
   /* ------- theme tokens ------- */
   :root {
@@ -614,27 +614,27 @@ export const UI_HTML = `<!doctype html>
 <!-- login -->
 <div id="login">
   <form id="login-form" class="card">
-    <h1>agentchat</h1>
+    <h1>droingring</h1>
     <p class="lead">Sign in with your access token.</p>
 
     <div class="help-box">
       <h3>Don't have the URL? Run one of these in your terminal:</h3>
-      <p>When agentchat is launched by Claude Code, Codex, or another MCP
+      <p>When droingring is launched by Claude Code, Codex, or another MCP
          host, the sign-in URL is logged to <em>that host's</em> log file —
          not shown in the chat. You can always recover it locally:</p>
       <div class="cmd-row">
-        <code>agentchat url</code>
-        <button type="button" class="copy-btn" data-copy="agentchat url">Copy</button>
+        <code>droingring url</code>
+        <button type="button" class="copy-btn" data-copy="droingring url">Copy</button>
         <small>prints the full URL</small>
       </div>
       <div class="cmd-row">
-        <code>cat ~/.agentchat/web-token</code>
-        <button type="button" class="copy-btn" data-copy="cat ~/.agentchat/web-token">Copy</button>
+        <code>cat ~/.droingring/web-token</code>
+        <button type="button" class="copy-btn" data-copy="cat ~/.droingring/web-token">Copy</button>
         <small>just the token</small>
       </div>
       <div class="cmd-row">
-        <code>agentchat doctor</code>
-        <button type="button" class="copy-btn" data-copy="agentchat doctor">Copy</button>
+        <code>droingring doctor</code>
+        <button type="button" class="copy-btn" data-copy="droingring doctor">Copy</button>
         <small>health check + URL</small>
       </div>
     </div>
@@ -642,7 +642,7 @@ export const UI_HTML = `<!doctype html>
     <div class="field">
       <label for="token-input">Token or sign-in URL</label>
       <input id="token-input" type="password" autocomplete="off" spellcheck="false"
-             placeholder="paste the output of agentchat url or the token itself">
+             placeholder="paste the output of droingring url or the token itself">
     </div>
     <div class="actions"><button class="btn primary" type="submit">Sign in</button></div>
   </form>
@@ -655,7 +655,7 @@ export const UI_HTML = `<!doctype html>
   <!-- left sidebar -->
   <aside id="sidebar">
     <div class="sidebar-head">
-      <span class="brand">agentchat</span>
+      <span class="brand">droingring</span>
       <button class="btn icon ghost" id="btn-new-room" title="New room">
         <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
@@ -854,7 +854,7 @@ export const UI_HTML = `<!doctype html>
   'use strict';
 
   // ------- theme -------
-  const THEME_KEY = 'agentchat_theme';
+  const THEME_KEY = 'droingring_theme';
   function applyTheme(t) {
     const v = (t === 'light' || t === 'dark') ? t : 'auto';
     document.documentElement.setAttribute('data-theme', v);
@@ -866,8 +866,8 @@ export const UI_HTML = `<!doctype html>
   applyTheme(localStorage.getItem(THEME_KEY) || 'auto');
 
   // ------- token + join bootstrap -------
-  const TOKEN_KEY = 'agentchat_token';
-  const PENDING_JOIN_KEY = 'agentchat_pending_join';
+  const TOKEN_KEY = 'droingring_token';
+  const PENDING_JOIN_KEY = 'droingring_pending_join';
   // localStorage so the UI remembers us across browser close/reopen — the
   // token is already scoped to localhost and protected by 0600 perms on
   // the source file. A "Sign out" button in Settings clears it.
@@ -882,7 +882,7 @@ export const UI_HTML = `<!doctype html>
   }
   // Accept either the bare 64-char token or a full URL containing
   // '#token=…' / '?token=…' — whatever the user pastes from
-  // 'agentchat url', 'cat ~/.agentchat/web-url', or the web-token file.
+  // 'droingring url', 'cat ~/.droingring/web-url', or the web-token file.
   function extractToken(s) {
     const trimmed = (s || '').trim();
     const m = /[#?&]token=([0-9a-fA-F]{64})/.exec(trimmed);
@@ -931,10 +931,10 @@ export const UI_HTML = `<!doctype html>
   let wsBackoff = 800;
   /** Unread count per room_id. Cleared on room-switch. Feeds the Electron
    * dock/taskbar badge and native notifications when running under the
-   * shell. In a plain browser tab, agentchatShell is undefined so these
+   * shell. In a plain browser tab, droingringShell is undefined so these
    * become no-ops. */
   const unread = new Map();
-  const shell = typeof window !== 'undefined' ? window.agentchatShell : undefined;
+  const shell = typeof window !== 'undefined' ? window.droingringShell : undefined;
 
   function totalUnread() {
     let n = 0;
@@ -946,7 +946,7 @@ export const UI_HTML = `<!doctype html>
     shell.setBadge(totalUnread());
     try {
       const room = rooms.find((r) => r.id === wireMsg.room_id);
-      const title = room ? room.name : 'agentchat';
+      const title = room ? room.name : 'droingring';
       const nick = wireMsg.payload && wireMsg.payload.nickname;
       const text = wireMsg.payload && wireMsg.payload.text;
       shell.notify(title, (nick ? '@' + nick + ': ' : '') + (text || ''));
@@ -1252,7 +1252,7 @@ export const UI_HTML = `<!doctype html>
     const e = document.createElement('div');
     e.className = 'welcome';
     const h = document.createElement('h2');
-    h.textContent = 'Welcome to agentchat';
+    h.textContent = 'Welcome to droingring';
     e.appendChild(h);
     const p = document.createElement('p');
     p.textContent = 'Peer-to-peer, end-to-end encrypted group chat for AI agents and humans. No server, no account — invite by ticket.';
@@ -1273,7 +1273,7 @@ export const UI_HTML = `<!doctype html>
     tips.className = 'welcome-tips';
     for (const t of [
       '\u{1F916} AI agents (Claude Code, Codex CLI, etc.) join via the MCP server.',
-      '\u{1F464} Humans use this web UI or the terminal (agentchat tui).',
+      '\u{1F464} Humans use this web UI or the terminal (droingring tui).',
       '\u{1F510} Messages are encrypted peer-to-peer. Share a room by ticket string.',
     ]) {
       const li = document.createElement('li');
@@ -1662,32 +1662,32 @@ export const UI_HTML = `<!doctype html>
   });
 
   function composeInvite(roomName, ticket) {
-    // Quick-link points at the RECIPIENT's default agentchat port (7879),
+    // Quick-link points at the RECIPIENT's default droingring port (7879),
     // not the sender's — the sender might be on a custom port but the
     // recipient almost certainly isn't. Falling back to the manual paste
     // step still works if their port differs.
     const quickLink = 'http://127.0.0.1:7879/#join=' + ticket;
     return [
-      'You\\'re invited to "' + roomName + '" on agentchat',
+      'You\\'re invited to "' + roomName + '" on droingring',
       '(peer-to-peer, end-to-end encrypted chat).',
       '',
       '── How to join ─────────────────────────',
       '',
-      '1. Install agentchat (macOS / Linux):',
-      '   curl -fsSL https://raw.githubusercontent.com/amazedsaint/agentchat/main/install.sh | sh',
+      '1. Install droingring (macOS / Linux):',
+      '   curl -fsSL https://raw.githubusercontent.com/amazedsaint/droingring/main/install.sh | sh',
       '',
       '2. Start the web UI:',
-      '   agentchat web',
-      '   (it also auto-launches when Claude Code or another MCP client spawns agentchat-mcp)',
+      '   droingring web',
+      '   (it also auto-launches when Claude Code or another MCP client spawns droingring-mcp)',
       '',
       '3. In the UI, click the "join" icon (top-left) and paste this ticket:',
       '',
       '   ' + ticket,
       '',
-      'Already running agentchat at the default port? One-click join:',
+      'Already running droingring at the default port? One-click join:',
       '   ' + quickLink,
       '',
-      'More: https://github.com/amazedsaint/agentchat',
+      'More: https://github.com/amazedsaint/droingring',
     ].join('\\n');
   }
 
@@ -1739,7 +1739,7 @@ export const UI_HTML = `<!doctype html>
     doCopy(currentShareTicket, () => toast('Ticket copied.'));
   });
   $('share-email').addEventListener('click', () => {
-    const subject = 'Invite: join "' + currentShareRoom + '" on agentchat';
+    const subject = 'Invite: join "' + currentShareRoom + '" on droingring';
     const body = $('share-message').value;
     location.href = 'mailto:?subject=' + encodeURIComponent(subject)
       + '&body=' + encodeURIComponent(body);
@@ -1747,7 +1747,7 @@ export const UI_HTML = `<!doctype html>
   $('share-native').addEventListener('click', async () => {
     if (typeof navigator.share !== 'function') return;
     const payload = {
-      title: 'Join "' + currentShareRoom + '" on agentchat',
+      title: 'Join "' + currentShareRoom + '" on droingring',
       text: $('share-message').value,
     };
     if (navigator.canShare && !navigator.canShare(payload)) {

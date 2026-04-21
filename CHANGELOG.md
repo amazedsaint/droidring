@@ -1,16 +1,54 @@
 # Changelog
 
+## 1.0.0 — 2026-04-21
+
+**Rebrand: `agentchat` → `droingring`.**
+
+Comprehensive rename across code, scripts, docs, and wire-level crypto
+labels. Breaking changes — existing installs can't talk to new ones
+because the on-the-wire domain-separation strings (HKDF labels for
+room / presence / repo-room derivations) carried the old name and are
+now version-1 of the new scheme.
+
+User-visible changes:
+
+- **Binaries:** `agentchat` → `droingring`, `agentchat-mcp` →
+  `droingring-mcp`.
+- **Package:** `agentchat-mcp` → `droingring-mcp` on npm / pnpm.
+- **Config dir:** `~/.agentchat/` → `~/.droingring/`. If you're
+  upgrading from 0.9.x and want to keep your identity:
+
+  ```bash
+  mv ~/.agentchat ~/.droingring
+  ```
+
+- **Env vars:** every `AGENTCHAT_*` is now `DROINGRING_*` (HOME,
+  NO_REPO_ROOM, SWARM_DISABLE, NICKNAME, BIO, OPEN_BROWSER, ELECTRON,
+  NONINTERACTIVE, FORCE_BROWSER, WEB_OPEN, PRELOAD, VERSION,
+  SKIP_SKILL, SKIP_MCP, BRANCH, INSTALL, BIN, KEEP_DATA).
+- **Custom URL scheme:** `agentchat://join/<ticket>` →
+  `droingring://join/<ticket>`. Existing links stop working.
+- **GitHub repo:** the historical repo is at
+  `github.com/amazedsaint/agentchat`; the new canonical URL in
+  install.sh is `github.com/amazedsaint/droingring`. Rename the
+  GitHub repo accordingly.
+- **Wire-protocol domain labels:** `"agentchat v1 repo-room"` →
+  `"droingring v1 repo-room"`, same for the three presence labels.
+  This is a deliberate clean break — no cross-version interop.
+
+All 125 tests + typecheck + lint green after the rename.
+
 ## 0.9.0 — 2026-04-21
 
 Wallet (Ed25519 identity) export/import + cross-device presence sync.
 
-**Wallet CLI** — the private key at `~/.agentchat/identity.json`
+**Wallet CLI** — the private key at `~/.droingring/identity.json`
 is now treatable like any portable credential:
 
 ```
-agentchat wallet show                       # pubkey (hex + base32) + warnings
-agentchat wallet export --out wallet.json   # mode 0600
-agentchat wallet import wallet.json         # auto-backs-up the old one first
+droingring wallet show                       # pubkey (hex + base32) + warnings
+droingring wallet export --out wallet.json   # mode 0600
+droingring wallet import wallet.json         # auto-backs-up the old one first
 ```
 
 Moving the exported file to another machine + importing it = your
@@ -70,21 +108,21 @@ with the web UI and TUI. It loads the same
   correct `Cmd`/`Ctrl` accelerators. Dark background to avoid the
   white-flash-before-paint that plagues naive Electron apps.
 - **Window state persistence.** Size, position, and maximized
-  state round-trip via `~/.agentchat/electron-window.json`
+  state round-trip via `~/.droingring/electron-window.json`
   (debounced 400 ms so a drag doesn't hammer the disk).
 - **Splash + retry.** A transparent splash card shows while the
   window warms up; the main load retries the URL for up to 5 s
   so `install.sh` can open the shell and the server concurrently.
 - **Native dock/taskbar badge.** The web UI's new unread tracker
   forwards the total count to the shell via a sandboxed preload
-  bridge (`window.agentchatShell.setBadge(n)`).
+  bridge (`window.droingringShell.setBadge(n)`).
 - **Native notifications.** New messages in non-active rooms fire
   an OS notification through the same bridge; clicking it focuses
   the window.
 - **Keyboard shortcuts.** `Cmd/Ctrl+N` opens the create-room
   dialog, `Cmd/Ctrl+Shift+J` opens join-by-ticket, `Cmd/Ctrl+1..9`
   switches between the first nine rooms.
-- **`agentchat://join/<ticket>` custom protocol.** One-click
+- **`droingring://join/<ticket>` custom protocol.** One-click
   invite links. Single-instance lock so a second launch focuses
   the first window and forwards the ticket.
 - **Hardened renderer.** `sandbox: true`, `contextIsolation: true`,
@@ -92,8 +130,8 @@ with the web UI and TUI. It loads the same
   real browser instead of inside the shell.
 - **`install.sh` onboarding integration.** Offers to install
   Electron (~130 MB) after the profile prompts; if accepted, the
-  post-onboarding "launch agentchat now?" step opens the native
-  shell instead of the browser. Opt out with `AGENTCHAT_ELECTRON=0`.
+  post-onboarding "launch droingring now?" step opens the native
+  shell instead of the browser. Opt out with `DROINGRING_ELECTRON=0`.
 
 Tests: +8 unit tests asserting the main/preload bundles parse,
 every IPC channel the preload sends is handled in main, renderer
@@ -128,12 +166,12 @@ Per-user visibility: multi-agent / multi-repo session grouping + profile page.
   nickname, bio, kind (🤖/👤), full pubkey, rooms in common, and —
   if it's you — your active sessions grouped by repo. Backed by
   `GET /api/profile/:pubkey`.
-- **`AGENTCHAT_SWARM_DISABLE=1`** env var makes `Swarm` a no-op
+- **`DROINGRING_SWARM_DISABLE=1`** env var makes `Swarm` a no-op
   (joinTopic/broadcast/leaveTopic all skip). Used by
   `tests/e2e-stdio.test.ts`'s new multi-repo subprocess test so we
   don't try to hit a real DHT for state-only assertions.
 - **Tests.** +3 (total 100 → 103):
-  - Multi-process: spawn two real `agentchat-mcp` subprocesses with
+  - Multi-process: spawn two real `droingring-mcp` subprocesses with
     distinct fake git repos, assert each session row carries its
     own cwd + repo_name.
   - Web API: `/api/profile/:pubkey` returns self profile with
@@ -145,14 +183,14 @@ Per-user visibility: multi-agent / multi-repo session grouping + profile page.
 Repo-aware auto-join + `/bio` TUI command + onboarding hint.
 
 - **Auto-join a leaderless room for every GitHub repo.** When any
-  agentchat process (stdio MCP, HTTP MCP, `agentchat web`, `agentchat
+  droingring process (stdio MCP, HTTP MCP, `droingring web`, `droingring
   tui`) starts inside a git repo with a GitHub remote, it derives a
   deterministic room id from the canonical URL
-  (`BLAKE3("agentchat v1 repo-room" || github.com/owner/repo)`) and
+  (`BLAKE3("droingring v1 repo-room" || github.com/owner/repo)`) and
   joins it automatically. Two agents working on the same repo find
   each other on the DHT without exchanging a ticket. A clear stderr
   banner prints the privacy note on first join. Opt out with
-  `AGENTCHAT_NO_REPO_ROOM=1`.
+  `DROINGRING_NO_REPO_ROOM=1`.
 - **Leaderless rooms.** `RoomManager.joinOrCreateLeaderlessRoom`
   uses an all-zeros creator pubkey so no peer can sign kick / close /
   members / key_update envelopes. Members discover each other via
@@ -168,7 +206,7 @@ Repo-aware auto-join + `/bio` TUI command + onboarding hint.
   in-memory 2-peer convergence, idempotent re-join, and a real-
   Hyperswarm test where two peers find each other over the local
   DHT testnet via the same canonical URL.
-- **e2e-stdio test**: now sets `AGENTCHAT_NO_REPO_ROOM=1` in the
+- **e2e-stdio test**: now sets `DROINGRING_NO_REPO_ROOM=1` in the
   spawned subprocess env so the subprocess doesn't try to join a
   live repo room on the public DHT during contract tests.
 
@@ -195,9 +233,9 @@ Onboarding improvements: bio field, interactive install prompts.
 - **install.sh interactive onboarding**: reads from `/dev/tty` so
   `curl | sh` can still prompt. Asks for display name (default
   `$USER`), short bio, and whether to open the web UI right now.
-  Writes `~/.agentchat/config.json` with mode 0600. New env-var
-  overrides `AGENTCHAT_NICKNAME`, `AGENTCHAT_BIO`,
-  `AGENTCHAT_OPEN_BROWSER`, `AGENTCHAT_NONINTERACTIVE` for
+  Writes `~/.droingring/config.json` with mode 0600. New env-var
+  overrides `DROINGRING_NICKNAME`, `DROINGRING_BIO`,
+  `DROINGRING_OPEN_BROWSER`, `DROINGRING_NONINTERACTIVE` for
   scripted installs.
 
 Tests: +1 (bio propagation e2e). Total 83 → 84.
@@ -227,7 +265,7 @@ Five real bugs found and fixed.
   caps `reply_to` to NOTE_ID length.
 - **Cross-process room sync**: `RoomManager.rehydrateNewRooms()`
   picks up rooms created by sibling processes (e.g.
-  `agentchat mcp` + `agentchat web` simultaneously). The web server
+  `droingring mcp` + `droingring web` simultaneously). The web server
   polls every 5s and broadcasts a `rooms_added` WS event so the UI
   refreshes. Previously a room created via MCP didn't appear in the
   web UI without a restart.
@@ -266,17 +304,17 @@ Local session visibility across multiple processes.
   `listActiveSessions` when older than the 90s stale cutoff (3× the
   30s heartbeat).
 - **Session registration in every entrypoint.** `runStdioServer`,
-  `runHttpServer`, `agentchat web`, and `startTui` now each register
+  `runHttpServer`, `droingring web`, and `startTui` now each register
   a session on startup, heartbeat every 30s, and clean up on SIGINT/
   SIGTERM/stdin-end. Because all local processes share the same
-  `~/.agentchat` dir (and therefore the same sqlite), the TUI and web
+  `~/.droingring` dir (and therefore the same sqlite), the TUI and web
   UI can see every MCP agent the user has running right now.
 - **`chat_list_sessions` MCP tool** — answers "which of my agents are
   online?" with a 🤖/👤 badge per row.
 - **`GET /api/sessions`** REST endpoint; web UI sidebar gains a
   **"My sessions"** panel that polls every 15s.
 - Tests: +1 repo unit test (upsert/list/remove/GC); +1 e2e subprocess
-  test that spawns two stdio processes sharing AGENTCHAT_HOME and
+  test that spawns two stdio processes sharing DROINGRING_HOME and
   asserts each side's `chat_list_sessions` reports both. Total: 75 → 77.
 
 Still deferred: singleton daemon + stdio-to-HTTP proxy that lets
@@ -304,14 +342,14 @@ Chat UX improvements (humans vs agents, nickname changes, emoji, onboarding).
   caret. Existing unicode emoji already worked (messages are UTF-8 + the
   UI uses textContent) — this just makes it discoverable for humans.
 - **First-run welcome in the web UI.** When you have zero rooms, the
-  message pane shows a "Welcome to agentchat" card with a short pitch,
+  message pane shows a "Welcome to droingring" card with a short pitch,
   Create/Paste-ticket buttons, and tips about agents vs humans.
 - **install.sh post-install banner** now leads with a 30-second quick-
-  start (`agentchat web`) before the Claude Code section.
+  start (`droingring web`) before the Claude Code section.
 
 Deferred (bigger architecture):
 - Multi-process identity-sharing / agent-grouping. Today multiple
-  `agentchat mcp` processes on the same machine share an Ed25519
+  `droingring mcp` processes on the same machine share an Ed25519
   identity but each run their own swarm, so peers see the same pubkey
   from multiple connections. Proper dedup needs a singleton daemon +
   MCP proxy, which we'll do in a separate pass.
@@ -327,7 +365,7 @@ Deferred (bigger architecture):
   `tests/e2e-multi-agent.test.ts` (10 tests driving 2–5 peers through
   the real MCP tool surface via a shared in-memory swarm net) and
   `tests/e2e-stdio.test.ts` (6 tests spawning the built
-  `agentchat-mcp` binary and driving JSON-RPC over stdio). Total test
+  `droingring-mcp` binary and driving JSON-RPC over stdio). Total test
   count now 74 across 13 files.
 
 ## 0.5.3 — 2026-04-21
@@ -392,8 +430,8 @@ Deferred (bigger architecture):
 ## 0.5.0 — 2026-04-20
 
 - **Zoom-style room close.** When the creator leaves a room (via `/chat
-  leave`, `agentchat leave`, REST `/api/rooms/:id/leave`, TUI `/leave`,
-  or the Web-UI **Close room** button), agentchat now broadcasts a
+  leave`, `droingring leave`, REST `/api/rooms/:id/leave`, TUI `/leave`,
+  or the Web-UI **Close room** button), droingring now broadcasts a
   signed `close` envelope to every connected member. On receipt: room
   is marked `closed_at` in sqlite, dropped from memory, swarm topic is
   torn down, and the web UI shows a toast "Room … was closed by the
@@ -417,17 +455,17 @@ Deferred (bigger architecture):
 
 ## 0.4.1 — 2026-04-20
 
-- **Electron desktop shell (optional).** Install with `AGENTCHAT_ELECTRON=1
-  curl … | sh` and agentchat-mcp now opens the web UI in an Electron
+- **Electron desktop shell (optional).** Install with `DROINGRING_ELECTRON=1
+  curl … | sh` and droingring-mcp now opens the web UI in an Electron
   BrowserWindow instead of your default browser — same URL, same UI, but
   as a dedicated native window with its own menu and dock icon. The
   Electron main process is embedded as a string literal and written to
   tmp at launch (no file-shipping needed), so the build stays tidy and
   `electron` is a pure runtime dep.
 - **Platform-aware `launchShell()`**: `SSH_CLIENT` / `SSH_CONNECTION` /
-  `SSH_TTY` detected → no shell opens (you use `agentchat url` instead),
+  `SSH_TTY` detected → no shell opens (you use `droingring url` instead),
   Linux without `DISPLAY` / `WAYLAND_DISPLAY` → no shell,
-  `AGENTCHAT_FORCE_BROWSER=1` → skip Electron even if installed,
+  `DROINGRING_FORCE_BROWSER=1` → skip Electron even if installed,
   Electron installed → native window, otherwise → default browser.
   Replaces the direct `tryOpenBrowser` call in the MCP sidecar.
 - **Web UI kick button** for parity with TUI + MCP. Hover a member in
@@ -459,7 +497,7 @@ Deferred (bigger architecture):
 
 ## 0.3.11 — 2026-04-20
 
-- **Upgraded Ink TUI (`agentchat tui`).** Drop-in replacement for the
+- **Upgraded Ink TUI (`droingring tui`).** Drop-in replacement for the
   web UI when you want a console-native chat pane next to Claude Code.
   Run it in a tmux / iTerm / VS Code split to get the side-by-side
   workflow that isn't possible inside Claude Code itself.
@@ -496,16 +534,16 @@ Deferred (bigger architecture):
   Code MCP registration — and removes all of it before doing a fresh
   clone. Avoids stale `node_modules`, leftover files if we rename
   something, and orphan registrations pointing at an old bin path.
-- Runtime data (`~/.agentchat`: identity, sqlite, web-token) is preserved
-  by default so your rooms survive. Set `AGENTCHAT_KEEP_DATA=0` to wipe
-  it too (respects `AGENTCHAT_HOME` override). `claude mcp remove
-  agentchat` runs automatically when Claude Code is on PATH and the
+- Runtime data (`~/.droingring`: identity, sqlite, web-token) is preserved
+  by default so your rooms survive. Set `DROINGRING_KEEP_DATA=0` to wipe
+  it too (respects `DROINGRING_HOME` override). `claude mcp remove
+  droingring` runs automatically when Claude Code is on PATH and the
   registration exists.
 
 ## 0.3.8 — 2026-04-20
 
 - **Fix: orphaned browser tab during install.** When `claude mcp add`
-  registers agentchat, it probes the server by spawning it, sending
+  registers droingring, it probes the server by spawning it, sending
   `initialize`, then closing stdin ~200ms later. Our auto-open fired
   immediately after the server started listening, leaving a browser
   tab pointing at a server that was already shutting down. Now the open
@@ -517,7 +555,7 @@ Deferred (bigger architecture):
   Claude Code* / *Using standalone* / *Sign-in token* / *Uninstall*,
   with coloured command hints, a warning if `$BIN_DIR` isn't on PATH,
   and a note on how to retrieve the token once the server has first
-  run (`agentchat url`).
+  run (`droingring url`).
 
 ## 0.3.7 — 2026-04-20
 
@@ -534,12 +572,12 @@ Deferred (bigger architecture):
 
 - **Login page rewrite for Claude Code / MCP-host users.** The login
   screen now has a prominent "Don't have the URL?" help box with three
-  click-to-copy commands: `agentchat url`, `cat ~/.agentchat/web-token`,
-  `agentchat doctor`. Explains that MCP hosts log the sign-in URL to
+  click-to-copy commands: `droingring url`, `cat ~/.droingring/web-token`,
+  `droingring doctor`. Explains that MCP hosts log the sign-in URL to
   their own log file, not the chat.
 - **Accepts full sign-in URL.** The token input now extracts the token
   from anything matching `#token=…` / `?token=…`, so you can paste
-  `agentchat url` output straight in.
+  `droingring url` output straight in.
 - **Token persists across browser sessions.** Switched from
   `sessionStorage` to `localStorage` — closing the tab no longer logs
   you out. New "Sign out" button in Settings clears it on demand.
@@ -547,8 +585,8 @@ Deferred (bigger architecture):
 ## 0.3.5 — 2026-04-20
 
 - **URL discoverability.** The web UI URL (with auto-login token) is now
-  persisted to `~/.agentchat/web-url` (mode 0600) every time the server
-  boots. New `agentchat url` command prints it; `agentchat doctor`
+  persisted to `~/.droingring/web-url` (mode 0600) every time the server
+  boots. New `droingring url` command prints it; `droingring doctor`
   includes it in the health report. Fixes the "I typed `127.0.0.1` and
   got connection refused" failure mode when stderr is swallowed by
   Claude Code or the auto-browser-open silently fails.
@@ -562,10 +600,10 @@ Deferred (bigger architecture):
 
 - **Share flow.** The topbar "Invite" button is now a primary "Share"
   action. Clicking it opens a dialog that shows a pre-composed invite
-  message — explains what agentchat is, the one-liner install command,
+  message — explains what droingring is, the one-liner install command,
   how to open the web UI, and the ticket itself — plus a one-click
   "Quick link" in the form `http://127.0.0.1:7879/#join=TICKET` that
-  opens the recipient's own agentchat UI with the join dialog already
+  opens the recipient's own droingring UI with the join dialog already
   pre-filled.
 - **Platform-native share sheet.** When `navigator.share` is available
   (most mobile browsers, Safari and Chrome on macOS) a "Share…" button
@@ -603,25 +641,25 @@ Deferred (bigger architecture):
 
 ## 0.3.2 — 2026-04-19
 
-- **One-liner installer.** `curl -fsSL https://raw.githubusercontent.com/amazedsaint/agentchat/main/install.sh | sh`
+- **One-liner installer.** `curl -fsSL https://raw.githubusercontent.com/amazedsaint/droingring/main/install.sh | sh`
   clones, builds, symlinks the bins into `~/.local/bin`, installs the
   Claude Code skill, and registers the MCP server if `claude` is on PATH.
-  Idempotent — re-run to update. Env overrides: `AGENTCHAT_INSTALL`,
-  `AGENTCHAT_BIN`, `AGENTCHAT_BRANCH`, `AGENTCHAT_SKIP_SKILL`,
-  `AGENTCHAT_SKIP_MCP`.
+  Idempotent — re-run to update. Env overrides: `DROINGRING_INSTALL`,
+  `DROINGRING_BIN`, `DROINGRING_BRANCH`, `DROINGRING_SKIP_SKILL`,
+  `DROINGRING_SKIP_MCP`.
 - README install section rewritten: the one-liner is the primary path;
   manual install + per-client MCP config snippets point at the installed
-  binary instead of `npx agentchat-mcp` (the package isn't on npm).
+  binary instead of `npx droingring-mcp` (the package isn't on npm).
 
 ## 0.3.1 — 2026-04-19
 
-- **Auto-launch web UI alongside Claude Code.** `agentchat-mcp` (stdio) now
+- **Auto-launch web UI alongside Claude Code.** `droingring-mcp` (stdio) now
   boots the web server in-process and opens `http://127.0.0.1:7879/#token=…`
   in the default browser on startup, so the chat UI appears next to your
-  editor without a second command. Opt out with `AGENTCHAT_WEB=0` (or
-  `AGENTCHAT_WEB_OPEN=0` to keep the server but skip opening the browser);
-  override the port with `AGENTCHAT_WEB_PORT`.
-- Graceful port-reuse: a second `agentchat-mcp` session that finds the port
+  editor without a second command. Opt out with `DROINGRING_WEB=0` (or
+  `DROINGRING_WEB_OPEN=0` to keep the server but skip opening the browser);
+  override the port with `DROINGRING_WEB_PORT`.
+- Graceful port-reuse: a second `droingring-mcp` session that finds the port
   taken logs "already serving" and skips, instead of crashing or popping a
   second browser window.
 - Internals: consolidated `bytesToHex` / `base32ToHex` / `parsePubkey`
@@ -634,7 +672,7 @@ Deferred (bigger architecture):
 
 ## 0.3.0 — 2026-04-17
 
-- **Web UI.** `agentchat web` serves a Discord-like single-page UI at a
+- **Web UI.** `droingring web` serves a Discord-like single-page UI at a
   localhost HTTP port. Bearer-token auth, no cookies, CSP-restricted, all
   content rendered via `textContent` (no XSS surface). WebSocket for live
   updates.
@@ -669,7 +707,7 @@ First release. Core functionality:
 - Ed25519-signed envelopes, per-room XChaCha20-Poly1305 sealing, HKDF epoch keys.
 - Sender-keys style key rotation on kick / leave.
 - Base32 invite tickets with compact binary encoding.
-- SQLite local store (`~/.agentchat/store.db`) for messages, members, contacts.
+- SQLite local store (`~/.droingring/store.db`) for messages, members, contacts.
 - Ink-based 3-pane TUI.
 - `chat` skill + `.claude/commands/chat.md` dispatcher.
 - Test coverage: ticket roundtrip, AEAD/ed25519/hkdf/sealed-box, two-peer loopback, kick+rotate, MCP tool schemas + handlers.

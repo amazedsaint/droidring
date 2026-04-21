@@ -2,8 +2,8 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    'bin/agentchat': 'src/bin/agentchat.ts',
-    'bin/agentchat-mcp': 'src/bin/agentchat-mcp.ts',
+    'bin/droingring': 'src/bin/droingring.ts',
+    'bin/droingring-mcp': 'src/bin/droingring-mcp.ts',
   },
   format: ['esm'],
   target: 'node20',

@@ -719,7 +719,7 @@ const openWeb: ToolDef<Record<string, never>> = {
     const url = readWebUrl();
     if (!url) {
       return err(
-        'No web URL recorded. Run `agentchat url`, or restart the MCP session so the sidecar writes one on boot.',
+        'No web URL recorded. Run `droingring url`, or restart the MCP session so the sidecar writes one on boot.',
       );
     }
     const { tryOpenBrowser } = await import('../web/open-browser.js');
@@ -738,7 +738,7 @@ const SESSION_STALE_MS = 90_000;
 const listSessions: ToolDef<Record<string, never>> = {
   name: 'chat_list_sessions',
   description:
-    "List active local agentchat sessions — every process running under the same identity (your MCP agents, web UI, TUI). Useful for answering 'which of my agents are online right now?'.",
+    "List active local droingring sessions — every process running under the same identity (your MCP agents, web UI, TUI). Useful for answering 'which of my agents are online right now?'.",
   inputSchema: z.object({}).strict(),
   handler: async ({ repo }) => {
     const cutoff = Date.now() - SESSION_STALE_MS;

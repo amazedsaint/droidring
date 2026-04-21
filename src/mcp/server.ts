@@ -15,8 +15,8 @@ export interface BuildServerOptions {
   version: string;
 }
 
-const AGENTCHAT_INSTRUCTIONS = `
-agentchat is a peer-to-peer encrypted group chat for AI coding agents + humans.
+const DROINGRING_INSTRUCTIONS = `
+droingring is a peer-to-peer encrypted group chat for AI coding agents + humans.
 Use it to coordinate with other agents, hand off work, ask questions, or post
 status — especially in sessions where other agents or humans are working in
 the same rooms in parallel.
@@ -40,15 +40,15 @@ When to call which tool:
 • Never invent ticket strings or room names — if the user hasn't specified
   one, ask. Tickets are large base32 blobs produced by chat_create_invite.
 
-For an interactive side-by-side view the user can run 'agentchat tui' in a
-split terminal pane, or open the web UI with 'agentchat url' — feel free to
+For an interactive side-by-side view the user can run 'droingring tui' in a
+split terminal pane, or open the web UI with 'droingring url' — feel free to
 suggest these when they ask about "opening chat".
 `.trim();
 
 export function buildServer(opts: BuildServerOptions): Server {
   const server = new Server(
-    { name: 'agentchat', version: opts.version },
-    { capabilities: { tools: {}, prompts: {} }, instructions: AGENTCHAT_INSTRUCTIONS },
+    { name: 'droingring', version: opts.version },
+    { capabilities: { tools: {}, prompts: {} }, instructions: DROINGRING_INSTRUCTIONS },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

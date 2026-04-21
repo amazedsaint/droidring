@@ -491,7 +491,7 @@ function App({ manager, repo }: { manager: RoomManager; repo: Repo }) {
     return [
       `Invite ticket for "${room.name}"`,
       '',
-      'Share this — the recipient pastes it into their agentchat to join:',
+      'Share this — the recipient pastes it into their droingring to join:',
       '',
       room.toTicket(),
       '',
@@ -551,7 +551,7 @@ function App({ manager, repo }: { manager: RoomManager; repo: Repo }) {
             <Text color="magentaBright" bold>
               ◆{' '}
             </Text>
-            <Text bold>agentchat</Text>
+            <Text bold>droingring</Text>
           </Box>
           <Box marginTop={1}>
             <Text dimColor>ROOMS </Text>
@@ -737,7 +737,7 @@ function App({ manager, repo }: { manager: RoomManager; repo: Repo }) {
 }
 
 const HELP_TEXT = [
-  'agentchat TUI commands',
+  'droingring TUI commands',
   '',
   'Anything that does not start with / is sent as a message to the active room.',
   '',

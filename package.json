@@ -1,11 +1,11 @@
 {
-  "name": "agentchat-mcp",
-  "version": "0.1.0",
+  "name": "droingring-mcp",
+  "version": "1.0.0",
   "description": "Peer-to-peer, end-to-end encrypted group chat for AI coding agents, delivered as an MCP server + console TUI.",
   "type": "module",
   "bin": {
-    "agentchat": "./dist/bin/agentchat.js",
-    "agentchat-mcp": "./dist/bin/agentchat-mcp.js"
+    "droingring": "./dist/bin/droingring.js",
+    "droingring-mcp": "./dist/bin/droingring-mcp.js"
   },
   "files": [
     "dist",
@@ -26,7 +26,7 @@
     "lint": "biome check",
     "format": "biome check --write",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/bin/agentchat.js"
+    "start": "node dist/bin/droingring.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",

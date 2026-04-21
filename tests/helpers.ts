@@ -9,7 +9,7 @@ import { openDatabase } from '../src/store/db.js';
 import { Repo } from '../src/store/repo.js';
 
 export function tmpDb() {
-  const dir = mkdtempSync(join(tmpdir(), 'agentchat-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'droingring-test-'));
   const db = openDatabase(join(dir, 'store.db'));
   return { repo: new Repo(db), dir, close: () => db.close() };
 }

@@ -22,7 +22,7 @@ export interface RoomManagerOptions {
   version: string;
   bio?: string;
   /** Stable UUID for this machine — used by the presence layer to
-   * distinguish multiple agentchat installs that share the same Ed25519
+   * distinguish multiple droingring installs that share the same Ed25519
    * identity. If omitted, presence sync is disabled. */
   machineId?: string;
   swarm?: Swarm;
@@ -246,7 +246,7 @@ export class RoomManager extends EventEmitter {
    * Rehydrate any rooms in the DB we don't already have in memory.
    *
    * Intended use: periodic refresh when the user has multiple local
-   * processes (e.g. agentchat mcp + agentchat web) running on the same
+   * processes (e.g. droingring mcp + droingring web) running on the same
    * identity. If the MCP process creates a room, the web process's
    * manager won't know until it rehydrates. Each call only wakes rooms
    * not already in `this.rooms`, so it's a no-op when there's nothing new.
@@ -499,7 +499,7 @@ export class RoomManager extends EventEmitter {
    * Direct message room derivation. Both participants must land on the same
    * room id + root secret independently. We derive:
    *   - a deterministic dm name from the sorted pair of pubkey prefixes
-   *   - a root secret = BLAKE3("agentchat v1 dm" || sortedA || sortedB)
+   *   - a root secret = BLAKE3("droingring v1 dm" || sortedA || sortedB)
    * So both sides produce identical rootSecret and room id.
    */
   async openDM(peerPubkey: Uint8Array): Promise<Room> {
@@ -512,7 +512,7 @@ export class RoomManager extends EventEmitter {
     const bShort = base32Encode(b).slice(0, 6);
     const dmName = `dm:${aShort}-${bShort}`;
 
-    const dmLabel = new TextEncoder().encode('agentchat v1 dm');
+    const dmLabel = new TextEncoder().encode('droingring v1 dm');
     const rootSecret = blake3(concatBytes(dmLabel, a, b), 32);
 
     // Compute the id directly so we can dedupe without instantiating.

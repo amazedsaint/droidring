@@ -32,7 +32,7 @@ export interface SwarmOptions {
 /** Escape hatch for tests + constrained environments: skip Hyperswarm
  * entirely. joinTopic / broadcast / leaveTopic become no-ops. Read once at
  * module load so per-call checks don't drift. */
-const SWARM_DISABLED = process.env.AGENTCHAT_SWARM_DISABLE === '1';
+const SWARM_DISABLED = process.env.DROINGRING_SWARM_DISABLE === '1';
 
 export class Swarm extends EventEmitter {
   private swarm: SwarmLike | null = null;

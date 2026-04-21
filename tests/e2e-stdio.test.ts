@@ -1,7 +1,7 @@
 /**
  * End-to-end stdio MCP subprocess test.
  *
- * Spawns the real built `dist/bin/agentchat-mcp.js`, drives it via
+ * Spawns the real built `dist/bin/droingring-mcp.js`, drives it via
  * newline-delimited JSON-RPC, and asserts the full tool contract works:
  *   - initialize → capabilities + protocolVersion
  *   - tools/list → every tool we registered
@@ -29,26 +29,26 @@ class StdioClient {
   private buf = '';
   private pending = new Map<number, (msg: any) => void>();
   private nextId = 1;
-  readonly agentchatHome: string;
+  readonly droingringHome: string;
   cwd: string | undefined;
   envOverrides: Record<string, string> = {};
 
   constructor() {
-    this.agentchatHome = mkdtempSync(join(tmpdir(), 'agentchat-e2e-'));
+    this.droingringHome = mkdtempSync(join(tmpdir(), 'droingring-e2e-'));
   }
 
   async start(): Promise<void> {
-    const bin = join(process.cwd(), 'dist/bin/agentchat-mcp.js');
+    const bin = join(process.cwd(), 'dist/bin/droingring-mcp.js');
     this.child = spawn(process.execPath, [bin], {
       cwd: this.cwd,
       env: {
         ...process.env,
-        AGENTCHAT_HOME: this.agentchatHome,
-        AGENTCHAT_WEB_OPEN: '0',
+        DROINGRING_HOME: this.droingringHome,
+        DROINGRING_WEB_OPEN: '0',
         // Default: skip repo-room auto-join so the subprocess doesn't touch
         // the public DHT. Individual tests that WANT the auto-join set
-        // envOverrides = { AGENTCHAT_SWARM_DISABLE: '1' } and clear this.
-        AGENTCHAT_NO_REPO_ROOM: '1',
+        // envOverrides = { DROINGRING_SWARM_DISABLE: '1' } and clear this.
+        DROINGRING_NO_REPO_ROOM: '1',
         ...this.envOverrides,
       },
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -112,7 +112,7 @@ class StdioClient {
       });
     });
     try {
-      rmSync(this.agentchatHome, { recursive: true, force: true });
+      rmSync(this.droingringHome, { recursive: true, force: true });
     } catch {
       /* ignore */
     }
@@ -223,7 +223,7 @@ describe('E2E stdio MCP subprocess', () => {
 describe('E2E multiple agents one user — session grouping by repo', () => {
   it('same user, two MCP processes, two different github repos → sessions tagged with their repo', async () => {
     const { mkdirSync, writeFileSync, realpathSync } = await import('node:fs');
-    const home = mkdtempSync(join(tmpdir(), 'agentchat-multi-repo-'));
+    const home = mkdtempSync(join(tmpdir(), 'droingring-multi-repo-'));
     const repoA = mkdtempSync(join(tmpdir(), 'repoA-'));
     const repoB = mkdtempSync(join(tmpdir(), 'repoB-'));
     for (const [dir, url] of [
@@ -236,11 +236,11 @@ describe('E2E multiple agents one user — session grouping by repo', () => {
 
     function buildClient(cwd: string): StdioClient {
       const c = new StdioClient();
-      (c as any).agentchatHome = home;
+      (c as any).droingringHome = home;
       c.cwd = cwd;
       // Keep repo-auto-join ON (unset the StdioClient default), but skip
       // the real DHT so this doesn't hit the public network.
-      c.envOverrides = { AGENTCHAT_NO_REPO_ROOM: '', AGENTCHAT_SWARM_DISABLE: '1' };
+      c.envOverrides = { DROINGRING_NO_REPO_ROOM: '', DROINGRING_SWARM_DISABLE: '1' };
       return c;
     }
     const a = buildClient(repoA);
@@ -293,16 +293,16 @@ describe('E2E multiple agents one user — session grouping by repo', () => {
 });
 
 describe('E2E multi-process session inventory', () => {
-  it('two stdio processes sharing AGENTCHAT_HOME see each other via chat_list_sessions', async () => {
+  it('two stdio processes sharing DROINGRING_HOME see each other via chat_list_sessions', async () => {
     // Shared home dir = shared sqlite, so both processes touch the same
     // sessions table. Both clients point at the same override directory;
     // cleanup is deferred until after both processes have exited so there's
     // no race on sqlite + WAL files.
-    const home = mkdtempSync(join(tmpdir(), 'agentchat-sessions-'));
+    const home = mkdtempSync(join(tmpdir(), 'droingring-sessions-'));
     const a = new StdioClient();
     const b = new StdioClient();
-    (a as any).agentchatHome = home;
-    (b as any).agentchatHome = home;
+    (a as any).droingringHome = home;
+    (b as any).droingringHome = home;
 
     try {
       await a.start();

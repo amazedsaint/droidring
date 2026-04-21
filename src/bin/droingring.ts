@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { Command } from 'commander';
 import { base32Encode } from '../p2p/base32.js';
 import {
-  agentchatDir,
+  droingringDir,
   identityPath,
   loadConfig,
   loadOrCreateIdentity,
@@ -15,7 +15,10 @@ import { buildContextAndServer, runHttpServer, runStdioServer } from './mcp-runn
 
 const program = new Command();
 
-program.name('agentchat').description('Peer-to-peer encrypted chat for AI agents').version('0.1.0');
+program
+  .name('droingring')
+  .description('Peer-to-peer encrypted chat for AI agents')
+  .version('0.1.0');
 
 program
   .command('mcp')
@@ -69,10 +72,10 @@ program
     });
     const linkable = `${srv.url}/#token=${token}`;
     writeWebUrl(linkable);
-    process.stderr.write('\n  ┌─ agentchat web UI ──────────────────────────────────────\n');
+    process.stderr.write('\n  ┌─ droingring web UI ──────────────────────────────────────\n');
     process.stderr.write(`  │  open this:  ${linkable}\n`);
     process.stderr.write(`  │  bind:       ${srv.url}\n`);
-    process.stderr.write('  │  also saved to ~/.agentchat/web-url  (agentchat url to print)\n');
+    process.stderr.write('  │  also saved to ~/.droingring/web-url  (droingring url to print)\n');
     process.stderr.write('  └─────────────────────────────────────────────────────────\n\n');
     const stop = async () => {
       session.cleanup();
@@ -93,7 +96,7 @@ program
     const url = readWebUrl();
     if (!url) {
       process.stderr.write(
-        `No web URL recorded at ${webUrlPath()}.\nStart one with \`agentchat web\` or let \`agentchat-mcp\` boot it.\n`,
+        `No web URL recorded at ${webUrlPath()}.\nStart one with \`droingring web\` or let \`droingring-mcp\` boot it.\n`,
       );
       process.exit(1);
     }
@@ -112,7 +115,7 @@ program
 program
   .command('wallet')
   .description(
-    'Manage your Ed25519 identity (aka wallet). Use this to move your agentchat identity between machines so your agents all show up as the same user.',
+    'Manage your Ed25519 identity (aka wallet). Use this to move your droingring identity between machines so your agents all show up as the same user.',
   )
   .addCommand(
     new Command('show').description('Print your public key + the on-disk path').action(() => {
@@ -127,9 +130,9 @@ program
           '  - 0600 permissions (already enforced)\n' +
           '  - never commit to git\n' +
           '  - to use the same identity on another machine, run\n' +
-          '      agentchat wallet export --out /tmp/agentchat-wallet.json\n' +
+          '      droingring wallet export --out /tmp/droingring-wallet.json\n' +
           '    copy the file to the other machine (scp / secure channel), then\n' +
-          '      agentchat wallet import /tmp/agentchat-wallet.json\n',
+          '      droingring wallet import /tmp/droingring-wallet.json\n',
       );
     }),
   )
@@ -140,7 +143,7 @@ program
       .action((opts) => {
         const src = identityPath();
         if (!existsSync(src)) {
-          console.error('No identity yet — run `agentchat` once to create one.');
+          console.error('No identity yet — run `droingring` once to create one.');
           process.exit(2);
         }
         const raw = readFileSync(src, 'utf8');
@@ -152,7 +155,7 @@ program
             /* best-effort */
           }
           process.stderr.write(
-            `[agentchat] exported to ${opts.out} (mode 0600). TREAT THIS FILE AS SECRET.\n`,
+            `[droingring] exported to ${opts.out} (mode 0600). TREAT THIS FILE AS SECRET.\n`,
           );
         } else {
           process.stdout.write(raw);
@@ -184,7 +187,7 @@ program
           typeof parsed.privateKey !== 'string'
         ) {
           console.error(
-            'Not an agentchat identity file (expected version=1 + publicKey + privateKey).',
+            'Not an droingring identity file (expected version=1 + publicKey + privateKey).',
           );
           process.exit(2);
         }
@@ -198,7 +201,7 @@ program
           } catch {
             /* ignore */
           }
-          process.stderr.write(`[agentchat] backed up existing identity to ${backup}\n`);
+          process.stderr.write(`[droingring] backed up existing identity to ${backup}\n`);
         }
         mkdirSync(dirname(dest), { recursive: true, mode: 0o700 });
         writeFileSync(dest, incoming);
@@ -208,7 +211,7 @@ program
           /* ignore */
         }
         process.stderr.write(
-          '[agentchat] identity replaced. You are now the user whose key you imported.\n',
+          '[droingring] identity replaced. You are now the user whose key you imported.\n',
         );
       }),
   );
@@ -252,9 +255,9 @@ program
   .command('doctor')
   .description('Check install health')
   .action(async () => {
-    const dir = agentchatDir();
+    const dir = droingringDir();
     const checks: Array<[string, boolean, string]> = [];
-    checks.push(['~/.agentchat exists', existsSync(dir), dir]);
+    checks.push(['~/.droingring exists', existsSync(dir), dir]);
     const id = loadOrCreateIdentity();
     checks.push([
       'identity loaded',

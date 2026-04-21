@@ -1,18 +1,18 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { agentchatDir } from '../p2p/identity.js';
+import { droingringDir } from '../p2p/identity.js';
 
 /**
  * The web UI authenticates every request with a Bearer token. The token is
- * generated on first run, stored at ~/.agentchat/web-token (0600), and
+ * generated on first run, stored at ~/.droingring/web-token (0600), and
  * printed to stderr so the user can copy it. Because we require a header
  * (not a cookie) and bind to 127.0.0.1 by default, CSRF is not a concern —
  * a cross-origin website can't read the token.
  */
 
 export function tokenPath(): string {
-  return join(agentchatDir(), 'web-token');
+  return join(droingringDir(), 'web-token');
 }
 
 export function loadOrCreateToken(): string {

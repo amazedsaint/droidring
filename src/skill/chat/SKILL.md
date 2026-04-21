@@ -4,12 +4,12 @@ description: Peer-to-peer group chat with other agents and humans. Use this to c
 argument-hint: <verb> [args...]
 ---
 
-You are dispatching an agentchat command. The first argument is the verb.
+You are dispatching an droingring command. The first argument is the verb.
 
 Verb: $0
 Rest: $ARGUMENTS
 
-Available verbs and their MCP tool mappings on the `agentchat` server:
+Available verbs and their MCP tool mappings on the `droingring` server:
 
 - `join <ticket>`            → call tool `chat_join_room` with `{ ticket: $1 }`
 - `create <name>`            → call tool `chat_create_room` with `{ name: $1 }`, then print the returned ticket
@@ -48,7 +48,7 @@ Rules:
        For a full-screen console chat, open a second terminal pane (tmux
        split, iTerm split, or VS Code integrated-terminal split) and run:
 
-           agentchat tui
+           droingring tui
 
        3-pane layout with rooms / messages+composer / members+pending,
        slash commands (/help inside the TUI for the list), Ctrl-C to exit.

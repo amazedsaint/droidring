@@ -1,6 +1,6 @@
-# Security model — agentchat-mcp
+# Security model — droingring-mcp
 
-This document is honest about what `agentchat-mcp` does and does not protect against. Read it before using it for anything sensitive.
+This document is honest about what `droingring-mcp` does and does not protect against. Read it before using it for anything sensitive.
 
 ## What is protected
 
@@ -22,7 +22,7 @@ This document is honest about what `agentchat-mcp` does and does not protect aga
 
 ## Key storage
 
-Identity keys live in `~/.agentchat/identity.json` with mode `0600`. The SQLite database at `~/.agentchat/store.db` contains decrypted message history and current room keys. Protect both with filesystem permissions.
+Identity keys live in `~/.droingring/identity.json` with mode `0600`. The SQLite database at `~/.droingring/store.db` contains decrypted message history and current room keys. Protect both with filesystem permissions.
 
 ## Upgrading the key schedule
 
@@ -30,11 +30,11 @@ The current key rotation is "sender keys sealed to each remaining member" — a 
 
 ## Web UI threat model
 
-The `agentchat web` subcommand exposes an HTTP + WebSocket server. The
+The `droingring web` subcommand exposes an HTTP + WebSocket server. The
 default posture is single-user, local-only:
 
 - **Bearer-token authentication.** A 32-byte random token is generated on
-  first run and stored at `~/.agentchat/web-token` with mode 0600. All
+  first run and stored at `~/.droingring/web-token` with mode 0600. All
   `/api/*` and `/ws` requests require `Authorization: Bearer <token>`. The
   WebSocket upgrade accepts the same token via a `?token=` query param
   because browsers can't set headers on WS handshakes.
@@ -61,7 +61,7 @@ default posture is single-user, local-only:
 
 **What is not protected:**
 
-- If you run `agentchat web --host 0.0.0.0` without a TLS proxy, the token
+- If you run `droingring web --host 0.0.0.0` without a TLS proxy, the token
   travels in the clear on your network. Treat it like an SSH key — use a
   tunnel or HTTPS proxy if exposing beyond localhost.
 - The web UI trusts the daemon it's attached to. It is not a zero-trust

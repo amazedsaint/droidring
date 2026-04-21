@@ -150,7 +150,7 @@ describe('RoomManager', () => {
 
   it('rehydrateNewRooms picks up rooms created by a sibling process', async () => {
     // Simulate two managers on the same identity + sqlite, like
-    // `agentchat mcp` + `agentchat web` running simultaneously. Process A
+    // `droingring mcp` + `droingring web` running simultaneously. Process A
     // creates a room; process B should see it after rehydrateNewRooms().
     const alice = makeIdentity();
     const { repo, dir, close } = tmpDb();
