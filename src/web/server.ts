@@ -67,6 +67,13 @@ export async function startWebServer(opts: WebServerOptions): Promise<WebServerH
       broadcast({ type: 'room_closed', ...info });
     },
   );
+  // Self-kick from the creator: the room is torn down on the manager side
+  // (src/p2p/manager.ts attachRoom self_kicked handler); this just surfaces
+  // an explicit toast signal to the UI. The rest of the teardown rides on
+  // the existing member_kicked → refreshRooms path.
+  manager.on('room_kicked', (info: { room_id: string; name: string }) => {
+    broadcast({ type: 'room_kicked', ...info });
+  });
   // `join_request` and `nickname_changed` fire on the Room, not the manager.
   // Bind once per room so re-firing `member_joined` doesn't leak listeners.
   const boundRooms = new Set<string>();
@@ -232,6 +239,23 @@ export async function startWebServer(opts: WebServerOptions): Promise<WebServerH
     srv.once('listening', onListening);
     srv.listen(port, host);
   });
+
+  // Pick up rooms created by a sibling process (e.g. agentchat mcp running
+  // alongside agentchat web on the same identity). Every 5s the manager
+  // scans its sqlite for rooms it doesn't have in memory and rehydrates
+  // them; the UI's own WS listeners fire from there. No-op when the DB
+  // hasn't changed.
+  const refreshTimer = setInterval(() => {
+    manager
+      .rehydrateNewRooms()
+      .then((added) => {
+        if (added > 0) broadcast({ type: 'rooms_added', count: added });
+      })
+      .catch(() => {
+        /* best-effort */
+      });
+  }, 5_000);
+  refreshTimer.unref?.();
   const addr = srv.address();
   const boundPort = typeof addr === 'object' && addr ? (addr as any).port : port;
 
@@ -241,6 +265,7 @@ export async function startWebServer(opts: WebServerOptions): Promise<WebServerH
     address: { host, port: boundPort },
     close: () =>
       new Promise<void>((resolve) => {
+        clearInterval(refreshTimer);
         for (const c of wsClients) c.close();
         srv.close(() => resolve());
       }),

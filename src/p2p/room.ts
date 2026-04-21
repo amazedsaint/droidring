@@ -109,6 +109,17 @@ export const INBOUND_LIMITS = {
   NICKNAME_CHARS: 128,
 };
 
+function validHello(inner: InnerHello): boolean {
+  if (typeof inner.nickname !== 'string' || inner.nickname.length > INBOUND_LIMITS.NICKNAME_CHARS)
+    return false;
+  if (typeof inner.client !== 'string' || inner.client.length > INBOUND_LIMITS.NICKNAME_CHARS)
+    return false;
+  if (typeof inner.version !== 'string' || inner.version.length > INBOUND_LIMITS.NICKNAME_CHARS)
+    return false;
+  if (!(inner.x25519_pub instanceof Uint8Array) || inner.x25519_pub.length !== 32) return false;
+  return true;
+}
+
 function validMembers(inner: InnerMembers): boolean {
   if (!Array.isArray(inner.members)) return false;
   if (inner.members.length > INBOUND_LIMITS.MEMBERS_GOSSIP) return false;
@@ -125,7 +136,10 @@ function validMembers(inner: InnerMembers): boolean {
 function validMsg(inner: InnerMsg): boolean {
   if (typeof inner.text !== 'string' || inner.text.length > INBOUND_LIMITS.MSG_TEXT) return false;
   if (typeof inner.id !== 'string' || inner.id.length > INBOUND_LIMITS.NOTE_ID) return false;
-  if (inner.reply_to !== undefined && typeof inner.reply_to !== 'string') return false;
+  if (inner.reply_to !== undefined) {
+    if (typeof inner.reply_to !== 'string' || inner.reply_to.length > INBOUND_LIMITS.NOTE_ID)
+      return false;
+  }
   return true;
 }
 
@@ -525,7 +539,7 @@ export class Room extends EventEmitter {
     switch (env.type) {
       case 'hello': {
         const inner = openEnvelope<InnerHello>(env, keys);
-        if (!inner) return false;
+        if (!inner || !validHello(inner)) return false;
         const key = base32Encode(env.from);
         const existing = this.members.get(key);
         const amCreator = Buffer.compare(this.identity.publicKey, this.creatorPubkey) === 0;

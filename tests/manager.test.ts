@@ -148,6 +148,54 @@ describe('RoomManager', () => {
     expect(repo.listRooms().some((r) => r.id === room.idHex)).toBe(false);
   });
 
+  it('rehydrateNewRooms picks up rooms created by a sibling process', async () => {
+    // Simulate two managers on the same identity + sqlite, like
+    // `agentchat mcp` + `agentchat web` running simultaneously. Process A
+    // creates a room; process B should see it after rehydrateNewRooms().
+    const alice = makeIdentity();
+    const { repo, dir, close } = tmpDb();
+
+    const mgrA = new RoomManager({
+      identity: alice,
+      repo,
+      nickname: 'a',
+      clientName: 't',
+      version: '0',
+      swarm: new FakeSwarm(),
+    });
+    await mgrA.start();
+
+    // Mgr B pointing at the same repo.
+    const { openDatabase } = await import('../src/store/db.js');
+    const { Repo } = await import('../src/store/repo.js');
+    const dbB = openDatabase(`${dir}/store.db`);
+    const repoB = new Repo(dbB);
+    const mgrB = new RoomManager({
+      identity: alice,
+      repo: repoB,
+      nickname: 'a',
+      clientName: 't',
+      version: '0',
+      swarm: new FakeSwarm(),
+    });
+    await mgrB.start();
+
+    // A creates a room AFTER B started — B has no in-memory record yet.
+    const room = await mgrA.createRoom('#sibling');
+    expect(mgrB.rooms.has(room.idHex)).toBe(false);
+
+    // B rehydrates; now it sees the room.
+    const added = await mgrB.rehydrateNewRooms();
+    expect(added).toBe(1);
+    expect(mgrB.rooms.has(room.idHex)).toBe(true);
+
+    // Second call is a no-op.
+    expect(await mgrB.rehydrateNewRooms()).toBe(0);
+
+    dbB.close();
+    close();
+  });
+
   it('ticket create + join roundtrips through manager', async () => {
     const alice = makeIdentity();
     const bob = makeIdentity();

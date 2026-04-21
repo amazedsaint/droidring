@@ -87,6 +87,22 @@ export class RoomManager extends EventEmitter {
     await Promise.all(this.repo.listRooms().map((r) => this.rehydrateRoom(r)));
   }
 
+  /**
+   * Rehydrate any rooms in the DB we don't already have in memory.
+   *
+   * Intended use: periodic refresh when the user has multiple local
+   * processes (e.g. agentchat mcp + agentchat web) running on the same
+   * identity. If the MCP process creates a room, the web process's
+   * manager won't know until it rehydrates. Each call only wakes rooms
+   * not already in `this.rooms`, so it's a no-op when there's nothing new.
+   */
+  async rehydrateNewRooms(): Promise<number> {
+    if (!this.started) return 0;
+    const missing = this.repo.listRooms().filter((r) => !this.rooms.has(r.id));
+    await Promise.all(missing.map((r) => this.rehydrateRoom(r)));
+    return missing.length;
+  }
+
   private async rehydrateRoom(r: import('../store/repo.js').RoomRow): Promise<void> {
     try {
       const rootSecret = base32Decode(r.root_secret);

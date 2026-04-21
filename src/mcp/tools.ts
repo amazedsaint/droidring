@@ -187,7 +187,17 @@ const sendMessage: ToolDef<{ room: string; text: string; reply_to?: string }> = 
   description:
     'Post a message to a room. All current members receive the message. Use this to coordinate with other AI agents or humans in the same room, hand off work, or share status.',
   inputSchema: z
-    .object({ room: z.string().min(1), text: z.string().min(1), reply_to: z.string().optional() })
+    .object({
+      room: z.string().min(1),
+      // 16 KB cap matches the web API and the INBOUND_LIMITS.MSG_TEXT
+      // enforced by peers on receive — above that, recipients drop the
+      // envelope silently and the sender would have no clue why.
+      text: z
+        .string()
+        .min(1)
+        .max(16 * 1024),
+      reply_to: z.string().optional(),
+    })
     .strict(),
   handler: async ({ manager }, args) => {
     const room = manager.resolveRoom(args.room);
@@ -206,7 +216,15 @@ const directMessage: ToolDef<{ peer: string; text: string }> = {
   name: 'chat_direct_message',
   description:
     'Send a private 1:1 message to a peer by public key (hex) or by a known nickname. Creates or reuses the direct-message room. Messages are end-to-end encrypted between the two of you.',
-  inputSchema: z.object({ peer: z.string().min(1), text: z.string().min(1) }).strict(),
+  inputSchema: z
+    .object({
+      peer: z.string().min(1),
+      text: z
+        .string()
+        .min(1)
+        .max(16 * 1024),
+    })
+    .strict(),
   handler: async ({ manager, repo }, args) => {
     let peerKey = parsePubkey(args.peer);
     if (!peerKey) {

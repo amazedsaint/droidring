@@ -145,6 +145,27 @@ describe('MCP tool handlers', () => {
     expect(res.isError).toBe(true);
   });
 
+  it('send_message rejects oversized text at the zod layer', async () => {
+    const id = makeIdentity();
+    const { repo } = tmpDb();
+    const manager = new RoomManager({
+      identity: id,
+      repo,
+      nickname: 'a',
+      clientName: 'test',
+      version: '0',
+      swarm: new FakeSwarm(),
+    });
+    await manager.start();
+    const create = ALL_TOOLS.find((t) => t.name === 'chat_create_room')!;
+    await create.handler({ manager, repo }, { name: '#cap' });
+    const send = ALL_TOOLS.find((t) => t.name === 'chat_send_message')!;
+    const oversized = 'x'.repeat(16 * 1024 + 1);
+    await expect(
+      send.inputSchema.parseAsync({ room: '#cap', text: oversized }),
+    ).rejects.toBeDefined();
+  });
+
   it('returns error for unknown room', async () => {
     const id = makeIdentity();
     const { repo } = tmpDb();

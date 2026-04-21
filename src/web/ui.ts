@@ -1311,6 +1311,14 @@ export const UI_HTML = `<!doctype html>
         toast('Room "' + msg.name + '" was closed by the creator.', 'warn');
         if (msg.room_id === activeRoomId) activeRoomId = null;
         refreshRooms();
+      } else if (msg.type === 'room_kicked') {
+        toast('You were removed from "' + msg.name + '".', 'warn');
+        if (msg.room_id === activeRoomId) activeRoomId = null;
+        refreshRooms();
+      } else if (msg.type === 'rooms_added') {
+        // A sibling process (MCP/TUI) created a room; server manager
+        // rehydrated it and told us to refresh the list.
+        refreshRooms();
       } else if (msg.type === 'nickname_changed') {
         const old = msg.old_nickname || msg.pubkey.slice(0, 8);
         const neu = msg.new_nickname || msg.pubkey.slice(0, 8);

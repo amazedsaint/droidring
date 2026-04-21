@@ -237,11 +237,22 @@ function App({ manager, repo }: { manager: RoomManager; repo: Repo }) {
     };
     const onRoomKicked = () => snapshotRooms();
 
+    const onRoomGone = (info: { name: string }) => {
+      // Creator closed or we were kicked: surface it as status and refresh.
+      setStatus(`left ${info.name}`);
+      snapshotRooms();
+      if (activeRef.current && !manager.rooms.has(activeRef.current)) {
+        setActiveRoomId(null);
+      }
+    };
+
     manager.on('message', onMessage);
     manager.on('members_update', onMembers);
     manager.on('member_joined', onMembers);
     manager.on('member_joined', onRoomAppeared);
     manager.on('member_kicked', onRoomKicked);
+    manager.on('room_kicked', onRoomGone);
+    manager.on('room_closed', onRoomGone);
 
     snapshotRooms();
 
@@ -251,6 +262,8 @@ function App({ manager, repo }: { manager: RoomManager; repo: Repo }) {
       manager.off('member_joined', onMembers);
       manager.off('member_joined', onRoomAppeared);
       manager.off('member_kicked', onRoomKicked);
+      manager.off('room_kicked', onRoomGone);
+      manager.off('room_closed', onRoomGone);
       for (const [id, fns] of bound) {
         const r = manager.rooms.get(id);
         if (r) {
@@ -731,10 +744,27 @@ export async function startTui(opts: { daemonUrl?: string }): Promise<void> {
   // Register as a local session so other local clients can see us.
   const { registerSession } = await import('../bin/mcp-runner.js');
   const session = registerSession(repo, { client: 'tui' });
-  process.once('exit', () => session.cleanup());
-  process.once('SIGINT', () => {
+  let ran = false;
+  const cleanup = () => {
+    if (ran) return;
+    ran = true;
     session.cleanup();
-    process.exit(0);
-  });
+    // The TUI owns the same sqlite handle that RoomManager uses, so a
+    // best-effort checkpoint + close on the way out keeps WAL tidy.
+    manager.stop().catch(() => {});
+    try {
+      (repo as any).db.pragma('wal_checkpoint(TRUNCATE)');
+      (repo as any).db.close();
+    } catch {
+      /* ignore */
+    }
+  };
+  process.once('exit', cleanup);
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(sig, () => {
+      cleanup();
+      process.exit(0);
+    });
+  }
   render(<App manager={manager} repo={repo} />);
 }

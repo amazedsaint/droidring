@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.6.3 — 2026-04-21
+
+4-pass audit sweep — TUI, web, edge cases, cross-process integration.
+Five real bugs found and fixed.
+
+- **TUI lifecycle**: `startTui` now handles `SIGTERM` (previously only
+  `SIGINT`) and runs a checkpoint + `db.close()` on exit. Session rows
+  no longer linger ~90s waiting for stale-GC.
+- **`room_kicked` WS broadcast**: self-kick now surfaces as an
+  explicit "you were removed from #foo" toast in the web UI and a
+  status line in the TUI. Previously the manager emitted the event
+  but nothing forwarded it — UX rode on the indirect
+  `member_kicked → refreshRooms` path.
+- **`chat_send_message` / `chat_direct_message` oversize cap**: MCP
+  tools now zod-enforce a 16 KB text cap, matching the web API and
+  the peer-side `INBOUND_LIMITS.MSG_TEXT`. Previously an agent
+  sending 100 KB would succeed locally but be silently dropped by
+  every recipient.
+- **`validHello` + `reply_to` length check on inbound**: the `hello`
+  envelope handler had no field validation (everything else did).
+  A malicious peer could stamp a 10 MB nickname or 1 MB x25519_pub
+  field. Now capped to 128 / 32 bytes respectively. `validMsg` also
+  caps `reply_to` to NOTE_ID length.
+- **Cross-process room sync**: `RoomManager.rehydrateNewRooms()`
+  picks up rooms created by sibling processes (e.g.
+  `agentchat mcp` + `agentchat web` simultaneously). The web server
+  polls every 5s and broadcasts a `rooms_added` WS event so the UI
+  refreshes. Previously a room created via MCP didn't appear in the
+  web UI without a restart.
+
+Tests: +2 (83 total). No swarm-level bugs surfaced.
+
 ## 0.6.2 — 2026-04-21
 
 Real-swarm integration test coverage.
