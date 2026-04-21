@@ -43,12 +43,13 @@ program
   .option('--port <port>', 'port (default 7879)', '7879')
   .option('--host <host>', 'bind host (default 127.0.0.1 — use 0.0.0.0 to expose)', '127.0.0.1')
   .action(async (opts) => {
-    const { buildContextAndServer } = await import('./mcp-runner.js');
+    const { buildContextAndServer, registerSession } = await import('./mcp-runner.js');
     const { manager, repo } = await buildContextAndServer();
     const { startWebServer } = await import('../web/server.js');
     const { loadOrCreateToken } = await import('../web/auth.js');
     const { writeWebUrl, clearWebUrl } = await import('../web/url-file.js');
     const token = loadOrCreateToken();
+    const session = registerSession(repo, { client: 'web' });
     const srv = await startWebServer({
       host: opts.host,
       port: Number(opts.port),
@@ -64,6 +65,7 @@ program
     process.stderr.write('  │  also saved to ~/.agentchat/web-url  (agentchat url to print)\n');
     process.stderr.write('  └─────────────────────────────────────────────────────────\n\n');
     const stop = async () => {
+      session.cleanup();
       clearWebUrl();
       await srv.close();
       await manager.stop();

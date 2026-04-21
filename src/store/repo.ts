@@ -587,6 +587,55 @@ export class Repo {
       .all(room_id) as JoinRequestRow[];
   }
 
+  // -------- sessions ------------------------------------------------------
+
+  upsertSession(s: {
+    id: string;
+    pid: number;
+    client: string;
+    kind: string;
+    started_at: number;
+    last_seen: number;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO sessions (id, pid, client, kind, started_at, last_seen)
+         VALUES (@id, @pid, @client, @kind, @started_at, @last_seen)
+         ON CONFLICT(id) DO UPDATE SET
+           pid=excluded.pid,
+           client=excluded.client,
+           kind=excluded.kind,
+           last_seen=excluded.last_seen`,
+      )
+      .run(s);
+  }
+
+  touchSession(id: string, last_seen: number): void {
+    this.db.prepare('UPDATE sessions SET last_seen = ? WHERE id = ?').run(last_seen, id);
+  }
+
+  removeSession(id: string): void {
+    this.db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+  }
+
+  /**
+   * List sessions whose last_seen is newer than `staleBeforeMs`. Also purges
+   * rows older than that — best-effort GC runs on every list call to keep
+   * the UI honest about "active" sessions even when a process crashed
+   * without unregistering.
+   */
+  listActiveSessions(staleBeforeMs: number): Array<{
+    id: string;
+    pid: number;
+    client: string;
+    kind: string;
+    started_at: number;
+    last_seen: number;
+  }> {
+    this.db.prepare('DELETE FROM sessions WHERE last_seen < ?').run(staleBeforeMs);
+    return this.db.prepare('SELECT * FROM sessions ORDER BY started_at ASC').all() as any[];
+  }
+
   setKv(k: string, v: string): void {
     this.db
       .prepare('INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v=excluded.v')

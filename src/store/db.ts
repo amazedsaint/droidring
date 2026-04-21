@@ -62,6 +62,21 @@ function migrate(db: DB): void {
       v TEXT NOT NULL
     );
 
+    -- Active local sessions — one row per running agentchat process
+    -- (stdio MCP, HTTP MCP, web sidecar, TUI). All share the same identity
+    -- (rows represent the same human, just different frontends/agents).
+    -- Rows are removed on graceful shutdown and GC'd when last_seen is
+    -- older than 5 × heartbeat_interval.
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,            -- random UUID, generated per process
+      pid INTEGER NOT NULL,
+      client TEXT NOT NULL,           -- e.g. "claude-code", "codex-cli", "web", "tui"
+      kind TEXT NOT NULL DEFAULT '',  -- "agent" | "human" | "unknown"
+      started_at INTEGER NOT NULL,
+      last_seen INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_last_seen ON sessions(last_seen);
+
     -- Shared notes (markdown). LWW on (updated_at, author) — ties broken by
     -- lexicographic author pubkey so every peer resolves identically.
     -- deleted=1 with deleted_at acts as a tombstone; replays with older

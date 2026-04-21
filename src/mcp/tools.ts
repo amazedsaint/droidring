@@ -691,6 +691,33 @@ const openWeb: ToolDef<Record<string, never>> = {
   },
 };
 
+/**
+ * Stale threshold = 3× heartbeat interval (30s). A process that crashed
+ * without cleanup will be GC'd after 90s. Shorter than that would race
+ * against a slow heartbeat; longer would leave dead rows lingering.
+ */
+const SESSION_STALE_MS = 90_000;
+
+const listSessions: ToolDef<Record<string, never>> = {
+  name: 'chat_list_sessions',
+  description:
+    "List active local agentchat sessions — every process running under the same identity (your MCP agents, web UI, TUI). Useful for answering 'which of my agents are online right now?'.",
+  inputSchema: z.object({}).strict(),
+  handler: async ({ repo }) => {
+    const cutoff = Date.now() - SESSION_STALE_MS;
+    const sessions = repo.listActiveSessions(cutoff);
+    const text = sessions.length
+      ? sessions
+          .map(
+            (s) =>
+              `- ${s.kind === 'agent' ? '🤖' : s.kind === 'human' ? '👤' : '·'} ${s.client} (pid ${s.pid})`,
+          )
+          .join('\n')
+      : '(no active sessions)';
+    return ok(text, { sessions });
+  },
+};
+
 export const ALL_TOOLS: ToolDef<any>[] = [
   whoami,
   createRoom,
@@ -719,4 +746,5 @@ export const ALL_TOOLS: ToolDef<any>[] = [
   approveJoin,
   denyJoin,
   openWeb,
+  listSessions,
 ];

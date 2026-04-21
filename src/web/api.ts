@@ -144,6 +144,13 @@ export async function handleApi(
     return respond(res, 200, { rooms: [...manager.rooms.values()].map(roomWire) });
   }
 
+  if (path === '/api/sessions' && method === 'GET') {
+    // 90s stale window = 3× the 30s heartbeat. Same constant as the MCP
+    // tool; any dead sessions are GC'd on the read.
+    const cutoff = Date.now() - 90_000;
+    return respond(res, 200, { sessions: repo.listActiveSessions(cutoff) });
+  }
+
   if (path === '/api/rooms' && method === 'POST') {
     const body = (await readJson(req)) as { name?: string; topic?: string; admission?: string };
     if (!body.name || body.name.length > 64) return respond(res, 400, { error: 'invalid name' });

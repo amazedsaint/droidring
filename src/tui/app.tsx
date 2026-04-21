@@ -728,5 +728,13 @@ const HELP_TEXT = [
 
 export async function startTui(opts: { daemonUrl?: string }): Promise<void> {
   const { manager, repo } = await createTuiClient(opts);
+  // Register as a local session so other local clients can see us.
+  const { registerSession } = await import('../bin/mcp-runner.js');
+  const session = registerSession(repo, { client: 'tui' });
+  process.once('exit', () => session.cleanup());
+  process.once('SIGINT', () => {
+    session.cleanup();
+    process.exit(0);
+  });
   render(<App manager={manager} repo={repo} />);
 }

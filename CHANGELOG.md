@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.6.1 — 2026-04-21
+
+Local session visibility across multiple processes.
+
+- **Sessions table.** Additive `sessions` sqlite table (id, pid, client,
+  kind, started_at, last_seen) + CRUD in Repo. Rows GC'd on
+  `listActiveSessions` when older than the 90s stale cutoff (3× the
+  30s heartbeat).
+- **Session registration in every entrypoint.** `runStdioServer`,
+  `runHttpServer`, `agentchat web`, and `startTui` now each register
+  a session on startup, heartbeat every 30s, and clean up on SIGINT/
+  SIGTERM/stdin-end. Because all local processes share the same
+  `~/.agentchat` dir (and therefore the same sqlite), the TUI and web
+  UI can see every MCP agent the user has running right now.
+- **`chat_list_sessions` MCP tool** — answers "which of my agents are
+  online?" with a 🤖/👤 badge per row.
+- **`GET /api/sessions`** REST endpoint; web UI sidebar gains a
+  **"My sessions"** panel that polls every 15s.
+- Tests: +1 repo unit test (upsert/list/remove/GC); +1 e2e subprocess
+  test that spawns two stdio processes sharing AGENTCHAT_HOME and
+  asserts each side's `chat_list_sessions` reports both. Total: 75 → 77.
+
+Still deferred: singleton daemon + stdio-to-HTTP proxy that lets
+multiple local MCP clients share ONE Hyperswarm instance (today each
+process runs its own — correct, but more DHT bandwidth than needed).
+Scoped for a later pass.
+
 ## 0.6.0 — 2026-04-21
 
 Chat UX improvements (humans vs agents, nickname changes, emoji, onboarding).

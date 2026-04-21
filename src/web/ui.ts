@@ -698,6 +698,8 @@ export const UI_HTML = `<!doctype html>
       <div id="pending-area"></div>
       <div class="aside-section" id="members-header">Online</div>
       <div id="members-list"></div>
+      <div class="aside-section" id="sessions-header" style="margin-top: 16px;">My sessions</div>
+      <div id="sessions-list"></div>
     </div>
   </aside>
 </div>
@@ -899,6 +901,10 @@ export const UI_HTML = `<!doctype html>
       $('app').classList.remove('hidden');
       renderMe();
       await refreshRooms();
+      refreshSessions();
+      // Sessions shift on a ~30s cadence (heartbeat) so polling every 15s is
+      // plenty — it catches process start/stop within one cadence boundary.
+      setInterval(refreshSessions, 15_000);
       openWs();
       // If the user arrived via a /#join=... share link, open the join
       // dialog pre-filled with the ticket (stashed across the login step).
@@ -931,6 +937,38 @@ export const UI_HTML = `<!doctype html>
     if (activeRoomId && !rooms.find((x) => x.id === activeRoomId)) activeRoomId = null;
     if (!activeRoomId && rooms.length > 0) await selectRoom(rooms[0].id);
     else await refreshActiveRoom();
+  }
+
+  // ------- sessions -------
+  async function refreshSessions() {
+    try {
+      const r = await api('/api/sessions');
+      renderSessions(r.sessions || []);
+    } catch (_) { /* ignore — web is usable without this */ }
+  }
+  function renderSessions(sessions) {
+    const box = $('sessions-list'); box.textContent = '';
+    $('sessions-header').textContent = 'My sessions · ' + sessions.length;
+    if (sessions.length === 0) {
+      const hint = document.createElement('div');
+      hint.style.color = 'var(--text-muted)';
+      hint.style.fontSize = '12px';
+      hint.style.padding = '6px 8px';
+      hint.textContent = '(none)';
+      box.appendChild(hint);
+      return;
+    }
+    for (const s of sessions) {
+      const row = document.createElement('div'); row.className = 'member-row';
+      const av = document.createElement('div'); av.className = 'mini-avatar';
+      const emoji = s.kind === 'agent' ? '\u{1F916}' : s.kind === 'human' ? '\u{1F464}' : '\u{00B7}';
+      av.textContent = emoji;
+      const nick = document.createElement('span'); nick.className = 'nick';
+      nick.textContent = s.client + ' · pid ' + s.pid;
+      nick.title = 'started ' + new Date(s.started_at).toLocaleTimeString();
+      row.appendChild(av); row.appendChild(nick);
+      box.appendChild(row);
+    }
   }
 
   function renderRooms() {

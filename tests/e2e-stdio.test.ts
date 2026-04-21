@@ -211,3 +211,48 @@ describe('E2E stdio MCP subprocess', () => {
     expect(res.error || res.result?.isError).toBeTruthy();
   });
 });
+
+describe('E2E multi-process session inventory', () => {
+  it('two stdio processes sharing AGENTCHAT_HOME see each other via chat_list_sessions', async () => {
+    // Shared home dir = shared sqlite, so both processes touch the same
+    // sessions table. Both clients point at the same override directory;
+    // cleanup is deferred until after both processes have exited so there's
+    // no race on sqlite + WAL files.
+    const home = mkdtempSync(join(tmpdir(), 'agentchat-sessions-'));
+    const a = new StdioClient();
+    const b = new StdioClient();
+    (a as any).agentchatHome = home;
+    (b as any).agentchatHome = home;
+
+    try {
+      await a.start();
+      await b.start();
+
+      for (const c of [a, b]) {
+        await c.send('initialize', {
+          protocolVersion: '2025-11-25',
+          capabilities: {},
+          clientInfo: { name: 'e2e', version: '1.0.0' },
+        });
+      }
+
+      const res = await a.send('tools/call', {
+        name: 'chat_list_sessions',
+        arguments: {},
+      });
+      const sessions = res.result.structuredContent.sessions;
+      expect(sessions.length).toBeGreaterThanOrEqual(2);
+      const pids = new Set(sessions.map((s: any) => s.pid));
+      expect(pids.size).toBeGreaterThanOrEqual(2);
+    } finally {
+      // Stop both before any rm so neither process is still writing WAL.
+      await a.stop();
+      await b.stop();
+      try {
+        rmSync(home, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  }, 20_000);
+});

@@ -115,6 +115,40 @@ describe('Repo fetchSince cap', () => {
   });
 });
 
+describe('Repo sessions', () => {
+  it('upsert / list / remove + GC of stale rows', () => {
+    const { repo, close } = tmpDb();
+    const now = Date.now();
+    repo.upsertSession({
+      id: 's1',
+      pid: 111,
+      client: 'claude-code',
+      kind: 'agent',
+      started_at: now,
+      last_seen: now,
+    });
+    repo.upsertSession({
+      id: 's2',
+      pid: 222,
+      client: 'tui',
+      kind: 'human',
+      started_at: now - 10_000,
+      last_seen: now - 500_000, // stale
+    });
+    // listActiveSessions purges rows older than cutoff and returns the rest.
+    const active = repo.listActiveSessions(now - 90_000);
+    expect(active.length).toBe(1);
+    expect(active[0].id).toBe('s1');
+
+    // touch keeps alive, remove deletes.
+    repo.touchSession('s1', now + 1_000);
+    expect(repo.listActiveSessions(now).length).toBe(1);
+    repo.removeSession('s1');
+    expect(repo.listActiveSessions(now).length).toBe(0);
+    close();
+  });
+});
+
 describe('Repo markRoomClosed', () => {
   it('cascades delete of pending join requests', () => {
     const { repo, close } = tmpDb();

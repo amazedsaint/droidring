@@ -1,16 +1,64 @@
+import { randomUUID } from 'node:crypto';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { startHttpMcp } from '../mcp/http.js';
 import { buildServer } from '../mcp/server.js';
 import { loadConfig, loadOrCreateIdentity } from '../p2p/identity.js';
 import { RoomManager } from '../p2p/manager.js';
+import { clientKind } from '../p2p/room.js';
 import { type DB, openDatabase } from '../store/db.js';
 import { Repo } from '../store/repo.js';
 
 const VERSION = '0.1.0';
+const SESSION_HEARTBEAT_MS = 30_000;
 
 function detectClient(): string {
   // The env var is set by MCP clients in some cases; otherwise we guess from argv.
   return process.env.MCP_CLIENT_NAME || 'unknown';
+}
+
+/**
+ * Register this process as an active session in the shared sqlite store.
+ * All local processes (multiple MCP agents + TUI + web) share `agentchatDir()`
+ * so they can see each other's sessions and the UI can render a "My
+ * sessions" panel. Returns a cleanup function that removes the row on
+ * shutdown; also starts a heartbeat interval to keep last_seen fresh.
+ */
+export function registerSession(
+  repo: Repo,
+  opts: { client: string },
+): { id: string; cleanup: () => void } {
+  const id = randomUUID();
+  const client = opts.client || 'unknown';
+  const now = Date.now();
+  repo.upsertSession({
+    id,
+    pid: process.pid,
+    client,
+    kind: clientKind(client),
+    started_at: now,
+    last_seen: now,
+  });
+  const hb = setInterval(() => {
+    try {
+      repo.touchSession(id, Date.now());
+    } catch {
+      /* DB closed already — nothing to do */
+    }
+  }, SESSION_HEARTBEAT_MS);
+  // Prevent heartbeat from keeping the event loop alive when we otherwise
+  // would exit — MCP sessions end when the client closes stdin.
+  hb.unref?.();
+  return {
+    id,
+    cleanup: () => {
+      clearInterval(hb);
+      try {
+        repo.removeSession(id);
+      } catch {
+        /* ignore */
+      }
+    },
+  };
 }
 
 export async function buildContextAndServer(): Promise<{
@@ -42,7 +90,7 @@ export async function buildContextAndServer(): Promise<{
  * and the handle un-finalized. Registered once per process.
  */
 let shutdownRegistered = false;
-function registerShutdown(db: DB, manager: RoomManager): void {
+function registerShutdown(db: DB, manager: RoomManager, beforeDbClose?: () => void): void {
   if (shutdownRegistered) return;
   shutdownRegistered = true;
   let ran = false;
@@ -50,6 +98,13 @@ function registerShutdown(db: DB, manager: RoomManager): void {
     if (ran) return;
     ran = true;
     // Best-effort — swallow errors so we still exit.
+    if (beforeDbClose) {
+      try {
+        beforeDbClose();
+      } catch {
+        /* ignore */
+      }
+    }
     manager.stop().catch(() => {});
     try {
       db.pragma('wal_checkpoint(TRUNCATE)');
@@ -80,7 +135,8 @@ function registerShutdown(db: DB, manager: RoomManager): void {
 
 export async function runStdioServer(opts: { web?: boolean } = {}): Promise<void> {
   const { server, manager, repo, db } = await buildContextAndServer();
-  registerShutdown(db, manager);
+  const session = registerSession(repo, { client: detectClient() });
+  registerShutdown(db, manager, session.cleanup);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   if (opts.web) await launchWebSidecar(manager, repo);
@@ -148,7 +204,8 @@ async function launchWebSidecar(manager: RoomManager, repo: Repo): Promise<void>
 
 export async function runHttpServer(host: string, port: number): Promise<void> {
   const { manager, repo, db } = await buildContextAndServer();
-  registerShutdown(db, manager);
+  const session = registerSession(repo, { client: 'http-mcp' });
+  registerShutdown(db, manager, session.cleanup);
   startHttpMcp({
     host,
     port,
