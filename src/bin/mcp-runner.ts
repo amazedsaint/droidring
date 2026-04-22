@@ -30,7 +30,7 @@ export function detectClient(): string {
 
 /**
  * Register this process as an active session in the shared sqlite store.
- * All local processes (multiple MCP agents + TUI + web) share `droingringDir()`
+ * All local processes (multiple MCP agents + TUI + web) share `droidringDir()`
  * so they can see each other's sessions and the UI can render a "My
  * sessions" panel. Returns a cleanup function that removes the row on
  * shutdown; also starts a heartbeat interval to keep last_seen fresh.
@@ -171,7 +171,7 @@ export async function runStdioServer(opts: { web?: boolean } = {}): Promise<void
  * leaderless room keyed to that repo. This gives every agent working on
  * the same repo a shared coordination space without exchanging tickets.
  *
- * Opt out with DROINGRING_NO_REPO_ROOM=1. Privacy note printed to stderr
+ * Opt out with DROIDRING_NO_REPO_ROOM=1. Privacy note printed to stderr
  * on first join — anyone who knows the repo URL can derive the same
  * room id and join. For private coordination prefer a ticket-based room.
  */
@@ -179,7 +179,7 @@ async function maybeJoinRepoRoom(
   manager: RoomManager,
   session?: { tagRepo: (roomId: string, roomName: string) => void },
 ): Promise<void> {
-  if (process.env.DROINGRING_NO_REPO_ROOM === '1') return;
+  if (process.env.DROIDRING_NO_REPO_ROOM === '1') return;
   const hit = detectRepoRoom();
   if (!hit) return;
   try {
@@ -189,14 +189,14 @@ async function maybeJoinRepoRoom(
     session?.tagRepo(roomIdHex, hit.roomName);
     if (!alreadyHad) {
       process.stderr.write(
-        `[droingring] auto-joined ${hit.roomName} (derived from ${hit.canonical}).
+        `[droidring] auto-joined ${hit.roomName} (derived from ${hit.canonical}).
            Anyone who knows this repo URL can join the same room.
-           Set DROINGRING_NO_REPO_ROOM=1 to disable.
+           Set DROIDRING_NO_REPO_ROOM=1 to disable.
 `,
       );
     }
   } catch (e: any) {
-    process.stderr.write(`[droingring] repo-room auto-join failed: ${e?.message || e}\n`);
+    process.stderr.write(`[droidring] repo-room auto-join failed: ${e?.message || e}\n`);
   }
 }
 
@@ -207,27 +207,27 @@ async function launchWebSidecar(manager: RoomManager, repo: Repo): Promise<void>
   const { writeWebUrl } = await import('../web/url-file.js');
 
   const token = loadOrCreateToken();
-  const preferredPort = Number(process.env.DROINGRING_WEB_PORT || 7879);
+  const preferredPort = Number(process.env.DROIDRING_WEB_PORT || 7879);
 
   let srv: Awaited<ReturnType<typeof startWebServer>>;
   try {
     srv = await startWebServer({ host: '127.0.0.1', port: preferredPort, manager, repo, token });
   } catch (e: any) {
     if (e?.code === 'EADDRINUSE') {
-      // Port busy. Could be another droingring, could be an unrelated service.
+      // Port busy. Could be another droidring, could be an unrelated service.
       // Fall back to an OS-chosen ephemeral port so the UI still works, and
-      // the user can discover the actual URL via ~/.droingring/web-url.
+      // the user can discover the actual URL via ~/.droidring/web-url.
       try {
         srv = await startWebServer({ host: '127.0.0.1', port: 0, manager, repo, token });
         process.stderr.write(
-          `[droingring] port ${preferredPort} was busy, using ${srv.address.port} instead.\n`,
+          `[droidring] port ${preferredPort} was busy, using ${srv.address.port} instead.\n`,
         );
       } catch (e2: any) {
-        process.stderr.write(`[droingring] web UI failed to start: ${e2?.message || e2}\n`);
+        process.stderr.write(`[droidring] web UI failed to start: ${e2?.message || e2}\n`);
         return;
       }
     } else {
-      process.stderr.write(`[droingring] web UI failed to start: ${e?.message || e}\n`);
+      process.stderr.write(`[droidring] web UI failed to start: ${e?.message || e}\n`);
       return;
     }
   }
@@ -237,11 +237,11 @@ async function launchWebSidecar(manager: RoomManager, repo: Repo): Promise<void>
 
   // Prominent banner so it's not lost in a sea of other stderr.
   process.stderr.write('\n');
-  process.stderr.write('  ┌─ droingring web UI ──────────────────────────────────────\n');
+  process.stderr.write('  ┌─ droidring web UI ──────────────────────────────────────\n');
   process.stderr.write(`  │  ${url}\n`);
   process.stderr.write('  │\n');
-  process.stderr.write('  │  also saved to ~/.droingring/web-url\n');
-  process.stderr.write('  │  recover anytime with:  droingring url\n');
+  process.stderr.write('  │  also saved to ~/.droidring/web-url\n');
+  process.stderr.write('  │  recover anytime with:  droidring url\n');
   process.stderr.write('  └─────────────────────────────────────────────────────────\n\n');
 
   // Delay the shell open so short-lived verification probes (e.g.
@@ -250,7 +250,7 @@ async function launchWebSidecar(manager: RoomManager, repo: Repo): Promise<void>
   // session keeps stdin open for the whole session so the timer fires.
   const openTimer = setTimeout(async () => {
     const kind = await launchShell(url);
-    if (kind !== 'none') process.stderr.write(`[droingring] shell launched (${kind}).\n`);
+    if (kind !== 'none') process.stderr.write(`[droidring] shell launched (${kind}).\n`);
   }, 1500);
   const cancel = () => clearTimeout(openTimer);
   process.once('SIGTERM', cancel);
@@ -272,5 +272,5 @@ export async function runHttpServer(host: string, port: number): Promise<void> {
     port,
     build: async () => buildServer({ ctx: { manager, repo }, version: VERSION }),
   });
-  console.error(`[droingring] Streamable HTTP MCP listening on http://${host}:${port}/mcp`);
+  console.error(`[droidring] Streamable HTTP MCP listening on http://${host}:${port}/mcp`);
 }

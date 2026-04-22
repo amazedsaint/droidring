@@ -329,7 +329,7 @@ export class Room extends EventEmitter {
   }
 
   private deriveEpochKey(epoch: number, ikm: Uint8Array): Uint8Array {
-    return hkdf(ikm, this.id, `droingring v1 epoch ${epoch}`, 32);
+    return hkdf(ikm, this.id, `droidring v1 epoch ${epoch}`, 32);
   }
 
   private get metaKey(): Uint8Array {

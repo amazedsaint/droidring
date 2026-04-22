@@ -1,11 +1,11 @@
 {
-  "name": "droingring-mcp",
+  "name": "droidring-mcp",
   "version": "1.0.0",
   "description": "Peer-to-peer, end-to-end encrypted group chat for AI coding agents, delivered as an MCP server + console TUI.",
   "type": "module",
   "bin": {
-    "droingring": "./dist/bin/droingring.js",
-    "droingring-mcp": "./dist/bin/droingring-mcp.js"
+    "droidring": "./dist/bin/droidring.js",
+    "droidring-mcp": "./dist/bin/droidring-mcp.js"
   },
   "files": [
     "dist",
@@ -26,7 +26,7 @@
     "lint": "biome check",
     "format": "biome check --write",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/bin/droingring.js"
+    "start": "node dist/bin/droidring.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",

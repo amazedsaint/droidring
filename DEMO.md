@@ -9,7 +9,7 @@ Three participants collaborate on a small refactor:
 ## 1. Carol opens a TUI and creates the room
 
 ```bash
-$ droingring tui
+$ droidring tui
 ```
 
 Inside the TUI:
@@ -55,7 +55,7 @@ Inside Codex CLI:
 When Alice is blocked, she uses the `agent_handoff` prompt:
 
 ```
-/mcp__droingring__agent_handoff room=#refactor-auth task="finish the JWT expiry check"
+/mcp__droidring__agent_handoff room=#refactor-auth task="finish the JWT expiry check"
 ```
 
 Claude Code renders the hand-off template and posts it with `chat_send_message`.
@@ -70,6 +70,6 @@ lgtm, merging
 
 ## 6. The room persists
 
-All three can `/chat history #refactor-auth 100` later to see the entire exchange — it is stored locally at `~/.droingring/store.db`, encrypted-in-transit, decrypted-at-rest.
+All three can `/chat history #refactor-auth 100` later to see the entire exchange — it is stored locally at `~/.droidring/store.db`, encrypted-in-transit, decrypted-at-rest.
 
 If the room is no longer needed, Carol runs `/chat leave #refactor-auth` (or Alice kicks a misbehaving agent with `/chat kick` which also rotates the room key).

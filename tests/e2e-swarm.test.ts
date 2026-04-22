@@ -263,11 +263,11 @@ describe('E2E real Hyperswarm', () => {
     const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
-    const dir = mkdtempSync(join(tmpdir(), 'droingring-swarm-repo-'));
+    const dir = mkdtempSync(join(tmpdir(), 'droidring-swarm-repo-'));
     mkdirSync(join(dir, '.git'), { recursive: true });
     writeFileSync(
       join(dir, '.git', 'config'),
-      '[remote "origin"]\n\turl = https://github.com/amazedsaint/droingring.git\n',
+      '[remote "origin"]\n\turl = https://github.com/amazedsaint/droidring.git\n',
     );
     const hit = detectRepoRoom(dir);
     rmSync(dir, { recursive: true, force: true });

@@ -65,7 +65,7 @@ describe('Web server', () => {
       const res = await fetch(`${srv.url}/`);
       expect(res.status).toBe(200);
       const body = await res.text();
-      expect(body).toMatch(/<title>droingring<\/title>/);
+      expect(body).toMatch(/<title>droidring<\/title>/);
       expect(res.headers.get('content-security-policy')).toMatch(/default-src 'self'/);
     } finally {
       await srv.close();

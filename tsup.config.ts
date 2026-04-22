@@ -2,8 +2,8 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    'bin/droingring': 'src/bin/droingring.ts',
-    'bin/droingring-mcp': 'src/bin/droingring-mcp.ts',
+    'bin/droidring': 'src/bin/droidring.ts',
+    'bin/droidring-mcp': 'src/bin/droidring-mcp.ts',
   },
   format: ['esm'],
   target: 'node20',

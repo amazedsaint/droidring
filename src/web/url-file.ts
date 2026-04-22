@@ -1,6 +1,6 @@
 import { chmodSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { droingringDir } from '../p2p/identity.js';
+import { droidringDir } from '../p2p/identity.js';
 
 /**
  * Persist the current web UI URL (including the token fragment) to a
@@ -10,7 +10,7 @@ import { droingringDir } from '../p2p/identity.js';
  */
 
 export function webUrlPath(): string {
-  return join(droingringDir(), 'web-url');
+  return join(droidringDir(), 'web-url');
 }
 
 export function writeWebUrl(url: string): void {

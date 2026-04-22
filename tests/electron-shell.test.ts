@@ -4,7 +4,7 @@
  * We can't spawn Electron itself in the vitest process (no display, no
  * electron binary in CI), so these tests assert:
  *   1. The main.js + preload.js string bundles parse as valid JavaScript.
- *   2. The preload exposes the documented `window.droingringShell` surface.
+ *   2. The preload exposes the documented `window.droidringShell` surface.
  *   3. `writeElectronShellFiles()` writes both files to a predictable path.
  *   4. `launchShell()` falls back to 'browser' when electron can't resolve.
  *
@@ -37,21 +37,21 @@ describe('Electron shell bundles', () => {
     for (const method of ['setBadge', 'notify', 'focus', 'onShortcut', 'onJoinTicket']) {
       expect(src).toContain(method);
     }
-    expect(src).toContain('droingringShell');
+    expect(src).toContain('droidringShell');
     expect(src).toContain('contextBridge.exposeInMainWorld');
   });
 
   it('main wires up every IPC message the preload sends', () => {
     const main = __electronBundleForTest.ELECTRON_MAIN_JS;
-    for (const channel of ['droingring:set-badge', 'droingring:notify', 'droingring:focus']) {
+    for (const channel of ['droidring:set-badge', 'droidring:notify', 'droidring:focus']) {
       expect(main).toContain(`ipcMain.on('${channel}'`);
     }
   });
 
-  it('main registers the droingring:// custom protocol', () => {
+  it('main registers the droidring:// custom protocol', () => {
     const main = __electronBundleForTest.ELECTRON_MAIN_JS;
-    expect(main).toContain("app.setAsDefaultProtocolClient('droingring')");
-    expect(main).toContain('droingring:join-ticket');
+    expect(main).toContain("app.setAsDefaultProtocolClient('droidring')");
+    expect(main).toContain('droidring:join-ticket');
   });
 
   it('main is locked down: sandbox: true + contextIsolation: true + nodeIntegration: false', () => {
@@ -74,16 +74,16 @@ describe('Electron shell bundles', () => {
 });
 
 describe('launchShell fallback', () => {
-  it('returns "none" when DROINGRING_WEB_OPEN=0', async () => {
-    const prev = process.env.DROINGRING_WEB_OPEN;
-    process.env.DROINGRING_WEB_OPEN = '0';
+  it('returns "none" when DROIDRING_WEB_OPEN=0', async () => {
+    const prev = process.env.DROIDRING_WEB_OPEN;
+    process.env.DROIDRING_WEB_OPEN = '0';
     try {
       const { launchShell } = await import('../src/web/launch-shell.js');
       const kind = await launchShell('http://127.0.0.1:7879/#token=x');
       expect(kind).toBe('none');
     } finally {
-      if (prev === undefined) process.env.DROINGRING_WEB_OPEN = undefined;
-      else process.env.DROINGRING_WEB_OPEN = prev;
+      if (prev === undefined) process.env.DROIDRING_WEB_OPEN = undefined;
+      else process.env.DROIDRING_WEB_OPEN = prev;
     }
   });
 });

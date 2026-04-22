@@ -1,7 +1,7 @@
 /**
  * Cross-device presence sync.
  *
- * Each machine running the same droingring identity derives the same
+ * Each machine running the same droidring identity derives the same
  * private-key-scoped DHT topic and AEAD key. Machines publish periodic
  * `presence` envelopes carrying their local session inventory; every
  * other machine on that identity receives, decrypts, and merges the
@@ -54,9 +54,9 @@ export interface PresencePayload {
   }>;
 }
 
-const PRESENCE_LABEL_TOPIC = new TextEncoder().encode('droingring v1 presence topic');
-const PRESENCE_LABEL_SEED = new TextEncoder().encode('droingring v1 presence seed');
-const PRESENCE_LABEL_KEY_INFO = 'droingring v1 presence key';
+const PRESENCE_LABEL_TOPIC = new TextEncoder().encode('droidring v1 presence topic');
+const PRESENCE_LABEL_SEED = new TextEncoder().encode('droidring v1 presence seed');
+const PRESENCE_LABEL_KEY_INFO = 'droidring v1 presence key';
 
 /**
  * Return `{ topic, key }`. Both are 32 bytes and deterministic from the

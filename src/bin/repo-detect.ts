@@ -40,7 +40,7 @@ export function detectRepoRoom(cwd = process.cwd()): RepoRoom | null {
   if (!parsed) return null;
   const canonical = `github.com/${parsed.owner}/${parsed.repo}`;
   const roomName = `#${parsed.owner}/${parsed.repo}`;
-  const label = new TextEncoder().encode('droingring v1 repo-room');
+  const label = new TextEncoder().encode('droidring v1 repo-room');
   const rootSecret = blake3(concatBytes(label, new TextEncoder().encode(canonical)), 32);
   return {
     canonical,

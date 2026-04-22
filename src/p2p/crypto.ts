@@ -169,7 +169,7 @@ export function deriveX25519FromIdentity(
   publicKey: Uint8Array;
   privateRaw: Uint8Array;
 } {
-  const seed = hkdf(edPrivateRaw, edPublicRaw, 'droingring v1 x25519 derive', 32);
+  const seed = hkdf(edPrivateRaw, edPublicRaw, 'droidring v1 x25519 derive', 32);
   // X25519 requires scalar clamping (top bit unset, etc.). Node accepts any
   // 32-byte value and clamps internally when performing the ECDH.
   const priv = x25519PrivateKeyFromRaw(seed);
@@ -184,7 +184,7 @@ export function deriveX25519FromIdentity(
 export function sealToX25519(recipientPublicRaw: Uint8Array, plaintext: Uint8Array): Uint8Array {
   const eph = generateX25519Keypair();
   const shared = x25519SharedSecret(eph.privateKey, recipientPublicRaw);
-  const key = hkdf(shared, recipientPublicRaw, 'droingring v1 sealed-box', 32);
+  const key = hkdf(shared, recipientPublicRaw, 'droidring v1 sealed-box', 32);
   const nonce = randomNonce();
   const ct = aeadSeal(key, nonce, plaintext);
   const out = new Uint8Array(32 + NONCE_BYTES + ct.length);
@@ -204,7 +204,7 @@ export function openSealedBox(
   const nonce = sealed.subarray(32, 32 + NONCE_BYTES);
   const ct = sealed.subarray(32 + NONCE_BYTES);
   const shared = x25519SharedSecret(recipientPrivate, ephPub);
-  const key = hkdf(shared, recipientPublicRaw, 'droingring v1 sealed-box', 32);
+  const key = hkdf(shared, recipientPublicRaw, 'droidring v1 sealed-box', 32);
   return aeadOpen(key, nonce, ct);
 }
 

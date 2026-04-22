@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { Command } from 'commander';
 import { base32Encode } from '../p2p/base32.js';
 import {
-  droingringDir,
+  droidringDir,
   identityPath,
   loadConfig,
   loadOrCreateIdentity,
@@ -16,7 +16,7 @@ import { buildContextAndServer, runHttpServer, runStdioServer } from './mcp-runn
 const program = new Command();
 
 program
-  .name('droingring')
+  .name('droidring')
   .description('Peer-to-peer encrypted chat for AI agents')
   .version('1.0.0');
 
@@ -72,10 +72,10 @@ program
     });
     const linkable = `${srv.url}/#token=${token}`;
     writeWebUrl(linkable);
-    process.stderr.write('\n  ┌─ droingring web UI ──────────────────────────────────────\n');
+    process.stderr.write('\n  ┌─ droidring web UI ──────────────────────────────────────\n');
     process.stderr.write(`  │  open this:  ${linkable}\n`);
     process.stderr.write(`  │  bind:       ${srv.url}\n`);
-    process.stderr.write('  │  also saved to ~/.droingring/web-url  (droingring url to print)\n');
+    process.stderr.write('  │  also saved to ~/.droidring/web-url  (droidring url to print)\n');
     process.stderr.write('  └─────────────────────────────────────────────────────────\n\n');
     const stop = async () => {
       session.cleanup();
@@ -96,7 +96,7 @@ program
     const url = readWebUrl();
     if (!url) {
       process.stderr.write(
-        `No web URL recorded at ${webUrlPath()}.\nStart one with \`droingring web\` or let \`droingring-mcp\` boot it.\n`,
+        `No web URL recorded at ${webUrlPath()}.\nStart one with \`droidring web\` or let \`droidring-mcp\` boot it.\n`,
       );
       process.exit(1);
     }
@@ -115,7 +115,7 @@ program
 program
   .command('wallet')
   .description(
-    'Manage your Ed25519 identity (aka wallet). Use this to move your droingring identity between machines so your agents all show up as the same user.',
+    'Manage your Ed25519 identity (aka wallet). Use this to move your droidring identity between machines so your agents all show up as the same user.',
   )
   .addCommand(
     new Command('show').description('Print your public key + the on-disk path').action(() => {
@@ -130,9 +130,9 @@ program
           '  - 0600 permissions (already enforced)\n' +
           '  - never commit to git\n' +
           '  - to use the same identity on another machine, run\n' +
-          '      droingring wallet export --out /tmp/droingring-wallet.json\n' +
+          '      droidring wallet export --out /tmp/droidring-wallet.json\n' +
           '    copy the file to the other machine (scp / secure channel), then\n' +
-          '      droingring wallet import /tmp/droingring-wallet.json\n',
+          '      droidring wallet import /tmp/droidring-wallet.json\n',
       );
     }),
   )
@@ -143,7 +143,7 @@ program
       .action((opts) => {
         const src = identityPath();
         if (!existsSync(src)) {
-          console.error('No identity yet — run `droingring` once to create one.');
+          console.error('No identity yet — run `droidring` once to create one.');
           process.exit(2);
         }
         const raw = readFileSync(src, 'utf8');
@@ -155,7 +155,7 @@ program
             /* best-effort */
           }
           process.stderr.write(
-            `[droingring] exported to ${opts.out} (mode 0600). TREAT THIS FILE AS SECRET.\n`,
+            `[droidring] exported to ${opts.out} (mode 0600). TREAT THIS FILE AS SECRET.\n`,
           );
         } else {
           process.stdout.write(raw);
@@ -187,7 +187,7 @@ program
           typeof parsed.privateKey !== 'string'
         ) {
           console.error(
-            'Not an droingring identity file (expected version=1 + publicKey + privateKey).',
+            'Not an droidring identity file (expected version=1 + publicKey + privateKey).',
           );
           process.exit(2);
         }
@@ -201,7 +201,7 @@ program
           } catch {
             /* ignore */
           }
-          process.stderr.write(`[droingring] backed up existing identity to ${backup}\n`);
+          process.stderr.write(`[droidring] backed up existing identity to ${backup}\n`);
         }
         mkdirSync(dirname(dest), { recursive: true, mode: 0o700 });
         writeFileSync(dest, incoming);
@@ -211,7 +211,7 @@ program
           /* ignore */
         }
         process.stderr.write(
-          '[droingring] identity replaced. You are now the user whose key you imported.\n',
+          '[droidring] identity replaced. You are now the user whose key you imported.\n',
         );
       }),
   );
@@ -255,9 +255,9 @@ program
   .command('doctor')
   .description('Check install health')
   .action(async () => {
-    const dir = droingringDir();
+    const dir = droidringDir();
     const checks: Array<[string, boolean, string]> = [];
-    checks.push(['~/.droingring exists', existsSync(dir), dir]);
+    checks.push(['~/.droidring exists', existsSync(dir), dir]);
     const id = loadOrCreateIdentity();
     checks.push([
       'identity loaded',

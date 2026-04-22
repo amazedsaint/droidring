@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`droingring-mcp` is a peer-to-peer, end-to-end encrypted group chat system for AI agents and humans. It ships as:
+`droidring-mcp` is a peer-to-peer, end-to-end encrypted group chat system for AI agents and humans. It ships as:
 
 - an **MCP server** (stdio + Streamable HTTP)
 - a **web UI** (HTTP + WebSocket, bearer-token auth)
 - an **Ink-based TUI**
-- a unified **CLI** (`droingring` with `web`, `tui`, `mcp`, `ticket`, `url`, `doctor` subcommands)
+- a unified **CLI** (`droidring` with `web`, `tui`, `mcp`, `ticket`, `url`, `doctor` subcommands)
 
-Peers find each other via Hyperswarm (DHT), exchange signed+encrypted envelopes over Noise streams, and persist everything in sqlite at `~/.droingring/store.db` (override with `DROINGRING_HOME`).
+Peers find each other via Hyperswarm (DHT), exchange signed+encrypted envelopes over Noise streams, and persist everything in sqlite at `~/.droidring/store.db` (override with `DROIDRING_HOME`).
 
 The human-facing install guide + Codex/Claude Desktop registration steps live in `README.md`.
 
@@ -26,7 +26,7 @@ pnpm exec tsc --noEmit                    # typecheck only
 pnpm exec biome check --write src tests   # lint + format (auto-fix)
 ```
 
-Built binaries: `dist/bin/droingring-mcp.js` (stdio MCP entrypoint) and `dist/bin/droingring.js` (CLI).
+Built binaries: `dist/bin/droidring-mcp.js` (stdio MCP entrypoint) and `dist/bin/droidring.js` (CLI).
 
 ## Architecture (outside-in)
 
@@ -39,7 +39,7 @@ Built binaries: `dist/bin/droingring-mcp.js` (stdio MCP entrypoint) and `dist/bi
 
 ### Crypto model
 
-- Identity: Ed25519 keypair at `~/.droingring/identity.json` (mode 0600). X25519 key is deterministically derived from the same seed via HKDF.
+- Identity: Ed25519 keypair at `~/.droidring/identity.json` (mode 0600). X25519 key is deterministically derived from the same seed via HKDF.
 - Every envelope is Ed25519-signed over metadata + ciphertext; payload is sealed with XChaCha20-Poly1305.
 - Per-room keys:
   - `metaKey` = epoch-0 key derivable from the ticket's `rootSecret`. Used for `hello`, `members`, `key_update`, `kick`, `close` — anyone with the ticket can decrypt these envelope types.
@@ -51,12 +51,12 @@ Built binaries: `dist/bin/droingring-mcp.js` (stdio MCP entrypoint) and `dist/bi
 
 1. **Ticket-based** (`createRoom` / `joinByTicket`) — one creator, random `rootSecret` at creation, invite by compact base32 ticket. Supports `open` and `approval` admission.
 2. **Leaderless repo rooms** (`joinOrCreateLeaderlessRoom`) — `rootSecret` deterministic from the canonical GitHub URL:
-   `BLAKE3("droingring v1 repo-room" || github.com/owner/repo)`. Creator pubkey is all-zeros, so no admin envelope ever validates. Auto-joined when `droingring` starts inside a git repo with a github.com origin (see `src/bin/repo-detect.ts`). Opt out with `DROINGRING_NO_REPO_ROOM=1`.
+   `BLAKE3("droidring v1 repo-room" || github.com/owner/repo)`. Creator pubkey is all-zeros, so no admin envelope ever validates. Auto-joined when `droidring` starts inside a git repo with a github.com origin (see `src/bin/repo-detect.ts`). Opt out with `DROIDRING_NO_REPO_ROOM=1`.
 3. **DMs** (`openDM`) — deterministic room id from the sorted pair of pubkeys; creator is the alphabetically-lower pubkey so both sides agree.
 
 ### Sessions + cross-process coordination
 
-Multiple droingring processes on the same machine share `~/.droingring` (identity + sqlite). Each runs its own Hyperswarm instance — to external peers they all appear as one Ed25519 pubkey.
+Multiple droidring processes on the same machine share `~/.droidring` (identity + sqlite). Each runs its own Hyperswarm instance — to external peers they all appear as one Ed25519 pubkey.
 
 Every local process registers a session row with `{pid, client, kind, cwd, repo_room_id, repo_name, started_at, last_seen}` — heartbeat every 30s, stale-GC after 90s. The web UI's "My sessions" panel groups by repo so the user sees which agent is running where.
 
@@ -80,7 +80,7 @@ A singleton-daemon + stdio-to-HTTP proxy would deduplicate swarms; it's a delibe
 |---|---|---|---|
 | Unit | `tests/{crypto,frame,ticket,repo}.test.ts` | pure functions, sqlite invariants | ms |
 | In-process multi-peer | `tests/e2e-multi-agent.test.ts`, `tests/repo-room.test.ts` | N `RoomManager`s wired through an in-memory `SwarmNet`. Full tool-handler path, no DHT. | ~3s |
-| Stdio subprocess | `tests/e2e-stdio.test.ts` | Spawns the real built `droingring-mcp.js`, drives JSON-RPC over pipes. Catches transport regressions. | ~5s |
+| Stdio subprocess | `tests/e2e-stdio.test.ts` | Spawns the real built `droidring-mcp.js`, drives JSON-RPC over pipes. Catches transport regressions. | ~5s |
 | Real Hyperswarm | `tests/e2e-swarm.test.ts` | Spins up a local `hyperdht` testnet and runs real Swarms that discover each other via DHT. | ~4s boot + tests |
 
 ### Notes for writing new tests
@@ -88,7 +88,7 @@ A singleton-daemon + stdio-to-HTTP proxy would deduplicate swarms; it's a delibe
 - Use `makeIdentity()` + `tmpDb()` from `tests/helpers.ts`.
 - For in-process multi-peer tests, copy the `SwarmNet` + `TestSwarm` classes at the top of `tests/e2e-multi-agent.test.ts`.
 - For subprocess tests sharing a sqlite, **start children serially** (initialize the first before spawning the second) to avoid sqlite migration races.
-- Subprocess tests should set `DROINGRING_NO_REPO_ROOM=1` and/or `DROINGRING_SWARM_DISABLE=1` unless they specifically need the DHT.
+- Subprocess tests should set `DROIDRING_NO_REPO_ROOM=1` and/or `DROIDRING_SWARM_DISABLE=1` unless they specifically need the DHT.
 - **macOS `/tmp` → `/private/tmp` symlink**: when asserting a subprocess's cwd from a tmp dir, compare against `realpathSync(tmpDir)`.
 
 ## Non-obvious invariants / gotchas

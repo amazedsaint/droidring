@@ -1,6 +1,6 @@
 /**
  * Tests for the presence-sync layer — the mechanism that surfaces sessions
- * from another machine running the same droingring identity in the local
+ * from another machine running the same droidring identity in the local
  * "My sessions" panel.
  *
  * Covered:

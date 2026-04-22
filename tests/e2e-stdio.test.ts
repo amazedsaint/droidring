@@ -1,7 +1,7 @@
 /**
  * End-to-end stdio MCP subprocess test.
  *
- * Spawns the real built `dist/bin/droingring-mcp.js`, drives it via
+ * Spawns the real built `dist/bin/droidring-mcp.js`, drives it via
  * newline-delimited JSON-RPC, and asserts the full tool contract works:
  *   - initialize → capabilities + protocolVersion
  *   - tools/list → every tool we registered
@@ -29,26 +29,26 @@ class StdioClient {
   private buf = '';
   private pending = new Map<number, (msg: any) => void>();
   private nextId = 1;
-  readonly droingringHome: string;
+  readonly droidringHome: string;
   cwd: string | undefined;
   envOverrides: Record<string, string> = {};
 
   constructor() {
-    this.droingringHome = mkdtempSync(join(tmpdir(), 'droingring-e2e-'));
+    this.droidringHome = mkdtempSync(join(tmpdir(), 'droidring-e2e-'));
   }
 
   async start(): Promise<void> {
-    const bin = join(process.cwd(), 'dist/bin/droingring-mcp.js');
+    const bin = join(process.cwd(), 'dist/bin/droidring-mcp.js');
     this.child = spawn(process.execPath, [bin], {
       cwd: this.cwd,
       env: {
         ...process.env,
-        DROINGRING_HOME: this.droingringHome,
-        DROINGRING_WEB_OPEN: '0',
+        DROIDRING_HOME: this.droidringHome,
+        DROIDRING_WEB_OPEN: '0',
         // Default: skip repo-room auto-join so the subprocess doesn't touch
         // the public DHT. Individual tests that WANT the auto-join set
-        // envOverrides = { DROINGRING_SWARM_DISABLE: '1' } and clear this.
-        DROINGRING_NO_REPO_ROOM: '1',
+        // envOverrides = { DROIDRING_SWARM_DISABLE: '1' } and clear this.
+        DROIDRING_NO_REPO_ROOM: '1',
         ...this.envOverrides,
       },
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -112,7 +112,7 @@ class StdioClient {
       });
     });
     try {
-      rmSync(this.droingringHome, { recursive: true, force: true });
+      rmSync(this.droidringHome, { recursive: true, force: true });
     } catch {
       /* ignore */
     }
@@ -223,7 +223,7 @@ describe('E2E stdio MCP subprocess', () => {
 describe('E2E multiple agents one user — session grouping by repo', () => {
   it('same user, two MCP processes, two different github repos → sessions tagged with their repo', async () => {
     const { mkdirSync, writeFileSync, realpathSync } = await import('node:fs');
-    const home = mkdtempSync(join(tmpdir(), 'droingring-multi-repo-'));
+    const home = mkdtempSync(join(tmpdir(), 'droidring-multi-repo-'));
     const repoA = mkdtempSync(join(tmpdir(), 'repoA-'));
     const repoB = mkdtempSync(join(tmpdir(), 'repoB-'));
     for (const [dir, url] of [
@@ -236,11 +236,11 @@ describe('E2E multiple agents one user — session grouping by repo', () => {
 
     function buildClient(cwd: string): StdioClient {
       const c = new StdioClient();
-      (c as any).droingringHome = home;
+      (c as any).droidringHome = home;
       c.cwd = cwd;
       // Keep repo-auto-join ON (unset the StdioClient default), but skip
       // the real DHT so this doesn't hit the public network.
-      c.envOverrides = { DROINGRING_NO_REPO_ROOM: '', DROINGRING_SWARM_DISABLE: '1' };
+      c.envOverrides = { DROIDRING_NO_REPO_ROOM: '', DROIDRING_SWARM_DISABLE: '1' };
       return c;
     }
     const a = buildClient(repoA);
@@ -293,16 +293,16 @@ describe('E2E multiple agents one user — session grouping by repo', () => {
 });
 
 describe('E2E multi-process session inventory', () => {
-  it('two stdio processes sharing DROINGRING_HOME see each other via chat_list_sessions', async () => {
+  it('two stdio processes sharing DROIDRING_HOME see each other via chat_list_sessions', async () => {
     // Shared home dir = shared sqlite, so both processes touch the same
     // sessions table. Both clients point at the same override directory;
     // cleanup is deferred until after both processes have exited so there's
     // no race on sqlite + WAL files.
-    const home = mkdtempSync(join(tmpdir(), 'droingring-sessions-'));
+    const home = mkdtempSync(join(tmpdir(), 'droidring-sessions-'));
     const a = new StdioClient();
     const b = new StdioClient();
-    (a as any).droingringHome = home;
-    (b as any).droingringHome = home;
+    (a as any).droidringHome = home;
+    (b as any).droidringHome = home;
 
     try {
       await a.start();

@@ -16,7 +16,7 @@ export interface Config {
   nickname: string;
   /** Short human-readable bio shown next to the nickname in room UIs. */
   bio?: string;
-  /** Stable UUID for this install of droingring, generated on first run.
+  /** Stable UUID for this install of droidring, generated on first run.
    * Used by the presence-sync layer to distinguish multiple machines that
    * share the same Ed25519 identity. */
   machine_id?: string;
@@ -51,18 +51,18 @@ export class Identity {
   }
 }
 
-export function droingringDir(): string {
-  const dir = process.env.DROINGRING_HOME || join(homedir(), '.droingring');
+export function droidringDir(): string {
+  const dir = process.env.DROIDRING_HOME || join(homedir(), '.droidring');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
   return dir;
 }
 
 export function identityPath(): string {
-  return join(droingringDir(), 'identity.json');
+  return join(droidringDir(), 'identity.json');
 }
 
 export function configPath(): string {
-  return join(droingringDir(), 'config.json');
+  return join(droidringDir(), 'config.json');
 }
 
 export function loadOrCreateIdentity(): Identity {

@@ -1,7 +1,7 @@
 /**
  * Deterministic-repo-room tests.
  *
- * Two peers who both run `droingring` in the same git repo must land in the
+ * Two peers who both run `droidring` in the same git repo must land in the
  * SAME room without exchanging a ticket. That's the whole point of the
  * repo-room feature: derive a room id from the canonical GitHub URL so
  * coordination is automatic.
@@ -38,7 +38,7 @@ describe('parseGithubRemote', () => {
 
 describe('detectRepoRoom', () => {
   it('returns null when cwd is not a git repo', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'droingring-norepo-'));
+    const dir = mkdtempSync(join(tmpdir(), 'droidring-norepo-'));
     try {
       expect(detectRepoRoom(dir)).toBeNull();
     } finally {
@@ -47,7 +47,7 @@ describe('detectRepoRoom', () => {
   });
 
   it('returns null when git repo has no origin remote', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'droingring-norem-'));
+    const dir = mkdtempSync(join(tmpdir(), 'droidring-norem-'));
     mkdirSync(join(dir, '.git'), { recursive: true });
     writeFileSync(join(dir, '.git', 'config'), '[core]\n\trepositoryformatversion = 0\n');
     try {
@@ -58,7 +58,7 @@ describe('detectRepoRoom', () => {
   });
 
   it('returns null when origin is non-GitHub', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'droingring-gitlab-'));
+    const dir = mkdtempSync(join(tmpdir(), 'droidring-gitlab-'));
     mkdirSync(join(dir, '.git'), { recursive: true });
     writeFileSync(
       join(dir, '.git', 'config'),
@@ -72,7 +72,7 @@ describe('detectRepoRoom', () => {
   });
 
   it('derives a stable room from a github remote', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'droingring-gh-'));
+    const dir = mkdtempSync(join(tmpdir(), 'droidring-gh-'));
     mkdirSync(join(dir, '.git'), { recursive: true });
     writeFileSync(
       join(dir, '.git', 'config'),
@@ -97,8 +97,8 @@ describe('detectRepoRoom', () => {
   });
 
   it('ssh and https URLs for the same repo produce the same rootSecret', () => {
-    const dirSsh = mkdtempSync(join(tmpdir(), 'droingring-ssh-'));
-    const dirHttps = mkdtempSync(join(tmpdir(), 'droingring-https-'));
+    const dirSsh = mkdtempSync(join(tmpdir(), 'droidring-ssh-'));
+    const dirHttps = mkdtempSync(join(tmpdir(), 'droidring-https-'));
     for (const [d, url] of [
       [dirSsh, 'git@github.com:acme/bar.git'],
       [dirHttps, 'https://github.com/acme/bar.git'],
@@ -262,7 +262,7 @@ describe('Leaderless repo room', () => {
 // real detector. Ensures we're exercising the same rootSecret derivation
 // that the runtime would.
 function detectRepoRoomFromUrl(url: string) {
-  const dir = mkdtempSync(join(tmpdir(), 'droingring-gh-from-url-'));
+  const dir = mkdtempSync(join(tmpdir(), 'droidring-gh-from-url-'));
   mkdirSync(join(dir, '.git'), { recursive: true });
   writeFileSync(join(dir, '.git', 'config'), `[remote "origin"]\n\turl = ${url}\n`);
   const hit = detectRepoRoom(dir);
