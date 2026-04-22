@@ -14,6 +14,8 @@
 #   DROIDRING_BIO="..."       pre-seed bio (skips the prompt)
 #   DROIDRING_OPEN_BROWSER=0  skip the "open the web UI" prompt (headless mode)
 #   DROIDRING_ELECTRON=1|0    force-install or skip the native desktop shell
+#   DROIDRING_LAUNCH=electron|web|tui|none   skip the "what to launch" menu
+#   DROIDRING_SERVICE=1|0     force-install or skip the persistent cron service
 
 set -eu
 
@@ -235,62 +237,126 @@ if [ -r /dev/tty ] && [ "${DROIDRING_NONINTERACTIVE:-0}" != "1" ]; then
     fi
   fi
 
-  # ---- Open the web UI now? ----
-  if [ "${DROIDRING_OPEN_BROWSER:-}" = "0" ]; then
-    open_browser=n
-  elif [ "${DROIDRING_OPEN_BROWSER:-}" = "1" ]; then
-    open_browser=y
+  # ---- Persistent background service (cron-based) ----
+  # This keeps `droidring web` alive across terminal sessions so multiple
+  # Claude Code agents and the web UI all share a single running daemon,
+  # and the web UI is always reachable at 127.0.0.1:7879.
+  INSTALL_SERVICE=0
+  if [ "${DROIDRING_SERVICE:-}" = "0" ]; then
+    :
+  elif [ "${DROIDRING_SERVICE:-}" = "1" ]; then
+    INSTALL_SERVICE=1
   else
-    if [ "$INSTALL_ELECTRON" = "1" ]; then
-      printf '  Launch droidring now? [Y/n] '
-    else
-      printf '  Open the web UI in your browser now? [Y/n] '
+    if command -v crontab >/dev/null 2>&1; then
+      printf '\n  \033[1mPersistent background service\033[0m\n'
+      printf '  Keep droidring running across terminal sessions and reboots?\n'
+      printf '  (adds a cron entry that restarts droidring web if it dies)\n'
+      printf '  [Y/n] '
+      read -r want_service < /dev/tty || want_service=""
+      case "${want_service:-y}" in
+        n|N|no|NO) INSTALL_SERVICE=0 ;;
+        *)         INSTALL_SERVICE=1 ;;
+      esac
     fi
-    read -r open_browser < /dev/tty || open_browser=""
   fi
-  case "${open_browser:-y}" in
-    n|N|no|NO) OPEN_BROWSER_NOW=0 ;;
-    *)         OPEN_BROWSER_NOW=1 ;;
-  esac
+  if [ "$INSTALL_SERVICE" = "1" ]; then
+    if "$BIN_DIR/droidring" service install >/dev/null 2>&1; then
+      printf '  \033[32m✓\033[0m persistent service installed — droidring web will stay alive\n'
+    else
+      printf '  \033[33m!\033[0m service install failed; run `droidring service install` manually\n'
+      INSTALL_SERVICE=0
+    fi
+  fi
+
+  # ---- What to launch now? ----
+  # Three interfaces:
+  #   electron — native desktop app (needs GUI + the electron dep we offered above)
+  #   web      — browser tab (works anywhere with a display)
+  #   tui      — full-screen console UI (works over SSH too)
+  #   none     — don't launch anything now; the service (if installed) or
+  #              the user's next `droidring web` will bring things up
+  LAUNCH_KIND=""
+  if [ -n "${DROIDRING_LAUNCH:-}" ]; then
+    case "$DROIDRING_LAUNCH" in
+      electron|web|tui|none) LAUNCH_KIND="$DROIDRING_LAUNCH" ;;
+      *) warn "ignoring DROIDRING_LAUNCH='$DROIDRING_LAUNCH' (expected electron|web|tui|none)" ;;
+    esac
+  fi
+  # Back-compat: honour DROIDRING_OPEN_BROWSER if set, even without LAUNCH.
+  if [ -z "$LAUNCH_KIND" ] && [ "${DROIDRING_OPEN_BROWSER:-}" = "0" ]; then
+    LAUNCH_KIND="none"
+  fi
+  if [ -z "$LAUNCH_KIND" ]; then
+    printf '\n  \033[1mWhich interface would you like to launch?\033[0m\n'
+    opt_n=1
+    if [ "$INSTALL_ELECTRON" = "1" ]; then
+      printf '    %d) Native desktop app (Electron)  — recommended\n' "$opt_n"; electron_opt=$opt_n; opt_n=$((opt_n+1))
+    else
+      electron_opt=""
+    fi
+    printf '    %d) Web UI in your browser\n'       "$opt_n"; web_opt=$opt_n; opt_n=$((opt_n+1))
+    printf '    %d) Console TUI (full-screen)\n'    "$opt_n"; tui_opt=$opt_n; opt_n=$((opt_n+1))
+    printf '    %d) Nothing now — I'"'"'ll launch it later\n' "$opt_n"; none_opt=$opt_n
+    if [ -n "$electron_opt" ]; then default_opt=$electron_opt; else default_opt=$web_opt; fi
+    printf '  Choose [%s]: ' "$default_opt"
+    read -r pick < /dev/tty || pick=""
+    pick="${pick:-$default_opt}"
+    if [ -n "$electron_opt" ] && [ "$pick" = "$electron_opt" ]; then LAUNCH_KIND="electron"
+    elif [ "$pick" = "$web_opt" ]; then LAUNCH_KIND="web"
+    elif [ "$pick" = "$tui_opt" ]; then LAUNCH_KIND="tui"
+    elif [ "$pick" = "$none_opt" ]; then LAUNCH_KIND="none"
+    else LAUNCH_KIND="web"
+    fi
+  fi
 else
-  OPEN_BROWSER_NOW=0
+  # Non-interactive (no tty): honour DROIDRING_LAUNCH, or fall back to "none".
+  LAUNCH_KIND="${DROIDRING_LAUNCH:-none}"
+  INSTALL_SERVICE=0
 fi
 
 # ---------- post-install banner ----------
 printf '\n'
 printf '\033[1;32m  ✓ droidring is installed.\033[0m\n'
 printf '\n'
-printf '  \033[1mTry it in 30 seconds\033[0m\n'
-printf '    \033[36m%s\033[0m          open the web UI in your browser\n' "droidring web"
-printf '    then click \033[1mCreate a room\033[0m — copy the invite ticket that appears,\n'
-printf '    and share it with another human or agent to start chatting.\n'
+printf '  \033[1mThree ways to use it\033[0m — same rooms, same messages, pick your flavour:\n'
+printf '    \033[36m%-22s\033[0m native desktop app (Electron)\n'           "droidring launch --kind electron"
+printf '    \033[36m%-22s\033[0m web UI in your browser\n'                  "droidring web"
+printf '    \033[36m%-22s\033[0m full-screen console UI\n'                  "droidring tui"
+printf '    \033[36m%-22s\033[0m auto-pick the best for this session\n'     "droidring launch"
 printf '\n'
-printf '  \033[1mUsing with Claude Code\033[0m\n'
+printf '  \033[1mClaude Code integration\033[0m\n'
 if command -v claude >/dev/null 2>&1; then
-  printf '    droidring is registered as an MCP server. Start a new\n'
-  printf '    Claude Code session — type \033[36m/chat help\033[0m to see the commands.\n'
+  printf '    droidring is registered as an MCP server. Start a new Claude Code\n'
+  printf '    session — type \033[36m/chat help\033[0m to see the commands.\n'
 else
   printf '    Install Claude Code (https://claude.com/claude-code), then:\n'
   printf '      \033[36mclaude mcp add droidring -s user -- %s/droidring-mcp\033[0m\n' "$BIN_DIR"
 fi
-printf '    The web UI auto-opens at \033[36mhttp://127.0.0.1:7879\033[0m when\n'
-printf '    a session starts. Your sign-in token is injected into the URL.\n'
 printf '\n'
-printf '  \033[1mUsing standalone\033[0m\n'
-printf '    \033[36m%s\033[0m              start the web UI manually\n' "droidring web"
-printf '    \033[36m%s\033[0m              print the sign-in URL (with token)\n' "droidring url"
-printf '    \033[36m%s\033[0m           health check + URL\n' "droidring doctor"
-printf '    \033[36m%s\033[0m           full command list\n' "droidring --help"
+printf '  \033[1mPersistent background service\033[0m\n'
+if command -v crontab >/dev/null 2>&1; then
+  printf '    \033[36m%-30s\033[0m install / remove / check\n' "droidring service install"
+  printf '    \033[36m%-30s\033[0m\n'                          "droidring service uninstall"
+  printf '    \033[36m%-30s\033[0m\n'                          "droidring service status"
+  printf '    A cron entry restarts droidring web every minute if it'"'"'s not running,\n'
+  printf '    so multiple agents and the web UI share one daemon.\n'
+else
+  printf '    (crontab is not available on this host; start droidring manually.)\n'
+fi
 printf '\n'
-printf '  \033[1mSign-in token\033[0m\n'
-printf '    Generated on first run and stored at \033[36m~/.droidring/web-token\033[0m\n'
-printf '    (mode 0600). If the auto-opened browser doesn'"'"'t show up or you\n'
-printf '    close the tab, run \033[36mdroidring url\033[0m for the full sign-in URL.\n'
+printf '  \033[1mHousekeeping\033[0m\n'
+printf '    \033[36m%-22s\033[0m print the sign-in URL (with token)\n' "droidring url"
+printf '    \033[36m%-22s\033[0m health check + URL\n'                 "droidring doctor"
+printf '    \033[36m%-22s\033[0m full command list\n'                  "droidring --help"
+printf '    Sign-in token lives at \033[36m~/.droidring/web-token\033[0m (mode 0600).\n'
 printf '\n'
 printf '  \033[1mUninstall\033[0m\n'
 printf '    rm -rf %s \\\n' "$INSTALL_DIR"
 printf '           %s/droidring %s/droidring-mcp \\\n' "$BIN_DIR" "$BIN_DIR"
 printf '           ~/.claude/skills/chat\n'
+if command -v crontab >/dev/null 2>&1; then
+  printf '    droidring service uninstall   # if you installed the service\n'
+fi
 if command -v claude >/dev/null 2>&1; then
   printf '    claude mcp remove droidring\n'
 fi
@@ -304,49 +370,67 @@ if [ "$on_path" -eq 0 ]; then
   printf '       export PATH="%s:$PATH"\n\n' "$BIN_DIR"
 fi
 
-# ---------- optionally launch the web UI ----------
-if [ "${OPEN_BROWSER_NOW:-0}" = "1" ]; then
-  if [ "$on_path" -eq 1 ] || [ -x "$BIN_DIR/droidring" ]; then
-    printf '\033[1;36m==> Starting droidring web…\033[0m\n'
-    mkdir -p "$HOME/.droidring"
-    WEB_URL_FILE="$HOME/.droidring/web-url"
-    WEB_LOG="$HOME/.droidring/web.log"
-    # Clear any stale URL so we only open once the NEW server has written it.
-    rm -f "$WEB_URL_FILE"
-    # Background so the install script can exit. Server writes the URL to
-    # ~/.droidring/web-url once it's listening.
-    nohup "$BIN_DIR/droidring" web >"$WEB_LOG" 2>&1 &
-    SRV_PID=$!
-    # Poll up to ~10 s — first-run bootstrap (identity gen, sqlite migration,
-    # Hyperswarm DHT) can take several seconds. Earlier versions only slept
-    # 1 s and silently skipped the browser-open when the URL file wasn't there.
-    # Exit the poll early if the child dies (misconfigured port etc.).
-    printf '   (waiting for server to start…)\n'
-    i=0
-    while [ "$i" -lt 40 ]; do
-      [ -r "$WEB_URL_FILE" ] && break
-      kill -0 "$SRV_PID" 2>/dev/null || break
-      sleep 0.25
-      i=$((i + 1))
-    done
-    if [ -r "$WEB_URL_FILE" ]; then
-      url=$(cat "$WEB_URL_FILE" 2>/dev/null | head -1)
-      if [ -n "$url" ]; then
-        if command -v open >/dev/null 2>&1; then
-          open "$url" >/dev/null 2>&1 || printf '   %s\n' "$url"
-        elif command -v xdg-open >/dev/null 2>&1; then
-          xdg-open "$url" >/dev/null 2>&1 || printf '   %s\n' "$url"
-        else
-          printf '   Open in your browser: %s\n' "$url"
-        fi
-      fi
-    else
-      printf '   \033[1;33m!\033[0m server did not write %s within 10 s\n' "$WEB_URL_FILE"
-      printf '     tail of log (%s):\n' "$WEB_LOG"
-      tail -n 10 "$WEB_LOG" 2>/dev/null | sed 's/^/       /'
-      printf '     Retry with \033[36mdroidring web\033[0m and check the banner it prints.\n'
-    fi
-  else
-    printf '   (skipped — %s not on PATH, run \033[36mdroidring web\033[0m yourself)\n' "$BIN_DIR"
+# ---------- launch the chosen interface ----------
+launch_tui_instructions() {
+  printf '\n\033[1;36m==> To launch the TUI, open a fresh terminal and run:\033[0m\n'
+  printf '      \033[36m%s tui\033[0m\n' "$BIN_DIR/droidring"
+  printf '    (Ink needs a live TTY, so we don'"'"'t start it from the installer.)\n'
+}
+
+launch_web_or_electron() {
+  # $1 = "electron" | "web"  (both start `droidring web` under the hood;
+  # the Electron preference is read from DROIDRING_FORCE_BROWSER / DROIDRING_ELECTRON
+  # by the server when it calls launchShell())
+  target_kind="$1"
+
+  if [ "$on_path" -eq 0 ] && [ ! -x "$BIN_DIR/droidring" ]; then
+    printf '   (skipped — %s not on PATH, run \033[36mdroidring launch\033[0m yourself)\n' "$BIN_DIR"
+    return
   fi
-fi
+
+  mkdir -p "$HOME/.droidring"
+  WEB_URL_FILE="$HOME/.droidring/web-url"
+  WEB_LOG="$HOME/.droidring/web.log"
+
+  # If the persistent service is managing the daemon, don't spawn a duplicate
+  # — just poll for the URL the service wrote.
+  if [ "${INSTALL_SERVICE:-0}" = "1" ]; then
+    printf '\033[1;36m==> Starting droidring via persistent service…\033[0m\n'
+  else
+    printf '\033[1;36m==> Starting droidring web…\033[0m\n'
+    rm -f "$WEB_URL_FILE"
+    # DROIDRING_WEB_OPEN=0: the CLI itself decides when to open a shell via
+    # our `droidring launch` call below — don't let the server double-launch.
+    DROIDRING_WEB_OPEN=0 nohup "$BIN_DIR/droidring" web >"$WEB_LOG" 2>&1 &
+    SRV_PID=$!
+  fi
+
+  printf '   (waiting for server to start…)\n'
+  i=0
+  while [ "$i" -lt 40 ]; do
+    [ -r "$WEB_URL_FILE" ] && break
+    [ "${INSTALL_SERVICE:-0}" = "1" ] || kill -0 "$SRV_PID" 2>/dev/null || break
+    sleep 0.25
+    i=$((i + 1))
+  done
+
+  if [ ! -r "$WEB_URL_FILE" ]; then
+    printf '   \033[1;33m!\033[0m server did not write %s within 10 s\n' "$WEB_URL_FILE"
+    printf '     tail of log (%s):\n' "$WEB_LOG"
+    tail -n 10 "$WEB_LOG" 2>/dev/null | sed 's/^/       /'
+    printf '     Retry with \033[36mdroidring launch\033[0m and check the banner it prints.\n'
+    return
+  fi
+
+  # Delegate to the CLI launcher — it knows how to pick Electron vs browser
+  # and prints the URL if neither is available.
+  "$BIN_DIR/droidring" launch --kind "$target_kind" --no-start \
+    || printf '   (Could not launch automatically — open the URL from %s yourself.)\n' "$WEB_URL_FILE"
+}
+
+case "${LAUNCH_KIND:-none}" in
+  electron) launch_web_or_electron electron ;;
+  web)      launch_web_or_electron browser ;;
+  tui)      launch_tui_instructions ;;
+  none|"")  : ;;
+esac

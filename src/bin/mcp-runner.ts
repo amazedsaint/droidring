@@ -10,7 +10,7 @@ import { type DB, openDatabase } from '../store/db.js';
 import { Repo } from '../store/repo.js';
 import { detectRepoRoom } from './repo-detect.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const SESSION_HEARTBEAT_MS = 30_000;
 
 /**

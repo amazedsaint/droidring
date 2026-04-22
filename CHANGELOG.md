@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.1.0 — 2026-04-22
+
+**Persistent background service + multi-interface launcher.**
+
+`droidring` can now stay alive across terminal sessions (so multiple
+Claude Code agents share one daemon and the web UI is always
+reachable), and the installer / CLI both know how to pick the best
+interface for the current host.
+
+- **New commands:**
+  - `droidring service install` — registers a cron entry
+    (`* * * * * droidring ensure`) that restarts the daemon if it's
+    not running. POSIX hosts only; on Windows it suggests using the
+    native service manager.
+  - `droidring service uninstall` — removes the cron entry.
+  - `droidring service status` — shows pid, URL, last heartbeat, cron
+    presence.
+  - `droidring ensure` — internal keeper invoked by cron. Re-stamps
+    the heartbeat file (`~/.droidring/service.heartbeat`) when the
+    daemon is healthy, respawns `droidring web` when it's not.
+  - `droidring launch [--kind electron|browser|tui|none]` —
+    capability-aware launcher. Adopts a running daemon via the
+    web-url file; honours `--no-start` to attach without spawning.
+- **Installer:** after profile setup, `install.sh` now offers:
+  1. an opt-in persistent service (cron) prompt, and
+  2. a numbered launcher menu (Electron / Web / TUI / None) with a
+     sensible default based on whether Electron was installed.
+  The post-install banner describes all three interfaces side-by-side
+  instead of only pushing the web UI.
+- **Environment:** `droidring web` now honours `$DROIDRING_WEB_PORT`
+  and `$DROIDRING_WEB_HOST` as fallbacks when `--port`/`--host` are
+  not passed — matches the stdio sidecar path so the service can run
+  on a user-chosen port without extra flags.
+
+New installer env vars: `DROIDRING_LAUNCH=electron|web|tui|none` and
+`DROIDRING_SERVICE=0|1` for fully non-interactive installs.
+
 ## 1.0.0 — 2026-04-21
 
 **Rebrand: `agentchat` → `droidring`.**

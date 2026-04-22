@@ -389,16 +389,16 @@ contextBridge.exposeInMainWorld('droidringShell', {
 });
 `;
 
-function isOverSsh(): boolean {
+export function isOverSsh(): boolean {
   return !!(process.env.SSH_CLIENT || process.env.SSH_CONNECTION || process.env.SSH_TTY);
 }
 
-function hasDisplay(): boolean {
+export function hasDisplay(): boolean {
   if (process.platform === 'darwin' || process.platform === 'win32') return true;
   return !!(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
 }
 
-async function resolveElectron(): Promise<string | null> {
+export async function resolveElectron(): Promise<string | null> {
   if (process.env.DROIDRING_FORCE_BROWSER === '1') return null;
   try {
     // Optional runtime dep — dynamic specifier keeps TS from resolving types
@@ -410,6 +410,26 @@ async function resolveElectron(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+export interface ShellCapabilities {
+  electron_available: boolean;
+  browser_available: boolean;
+  over_ssh: boolean;
+}
+
+/**
+ * Snapshot of what launch kinds this host can support. The CLI picker uses
+ * it to gray out options and pick a sensible default.
+ */
+export async function detectShellCapabilities(): Promise<ShellCapabilities> {
+  const electron = await resolveElectron();
+  const display = hasDisplay();
+  return {
+    electron_available: !!electron && display,
+    browser_available: display,
+    over_ssh: isOverSsh(),
+  };
 }
 
 export function writeElectronShellFiles(): { main: string; preload: string } {
@@ -427,13 +447,25 @@ export function writeElectronShellFiles(): { main: string; preload: string } {
  */
 export async function launchShell(
   url: string,
-  opts: { version?: string } = {},
+  opts: { version?: string; kind?: 'auto' | 'electron' | 'browser' | 'none' } = {},
 ): Promise<ShellKind> {
-  if (process.env.DROIDRING_WEB_OPEN === '0') return 'none';
-  if (isOverSsh()) return 'none';
-  if (!hasDisplay()) return 'none';
+  const kind = opts.kind ?? 'auto';
+  if (kind === 'none') return 'none';
+  // `auto` keeps the historical env-based gating so cron / headless installs
+  // never accidentally pop a window. A caller that explicitly requests a
+  // kind is assumed to know what they're doing — honour it.
+  if (kind === 'auto') {
+    if (process.env.DROIDRING_WEB_OPEN === '0') return 'none';
+    if (isOverSsh()) return 'none';
+    if (!hasDisplay()) return 'none';
+  }
 
-  const electronBin = await resolveElectron();
+  if (kind === 'browser') {
+    tryOpenBrowser(url);
+    return 'browser';
+  }
+
+  const electronBin = kind === 'electron' || kind === 'auto' ? await resolveElectron() : null;
   if (electronBin) {
     try {
       const { main, preload } = writeElectronShellFiles();
@@ -454,9 +486,14 @@ export async function launchShell(
       child.unref();
       return 'electron';
     } catch {
-      // fall through to browser
+      // Electron crashed on spawn — only fall back if the caller was happy
+      // with any GUI ('auto'). An explicit electron request gets 'none'.
     }
   }
+
+  // Explicit electron-only request but Electron unavailable: don't
+  // silently reach for the browser; the CLI picker surfaces this.
+  if (kind === 'electron') return 'none';
 
   tryOpenBrowser(url);
   return 'browser';

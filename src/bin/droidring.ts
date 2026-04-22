@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { Command } from 'commander';
 import { base32Encode } from '../p2p/base32.js';
@@ -9,16 +17,31 @@ import {
   loadOrCreateIdentity,
   saveConfig,
 } from '../p2p/identity.js';
+import {
+  cronSupported,
+  ensureDaemon,
+  installCron,
+  serviceLogPath,
+  serviceStatus,
+  uninstallCron,
+} from '../service/service.js';
 import { openDatabase } from '../store/db.js';
 import { Repo } from '../store/repo.js';
+import { detectShellCapabilities, launchShell } from '../web/launch-shell.js';
+import { readWebUrl } from '../web/url-file.js';
 import { buildContextAndServer, runHttpServer, runStdioServer } from './mcp-runner.js';
+
+// Gracefully exit when a downstream consumer closes the pipe
+// (e.g. `droidring service status | head -3`). Without this, Node throws
+// EPIPE as an unhandled 'error' event and the CLI dies with a stack trace.
+process.stdout.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EPIPE') process.exit(0);
+  throw err;
+});
 
 const program = new Command();
 
-program
-  .name('droidring')
-  .description('Peer-to-peer encrypted chat for AI agents')
-  .version('1.0.0');
+program.name('droidring').description('Peer-to-peer encrypted chat for AI agents').version('1.1.0');
 
 program
   .command('mcp')
@@ -50,9 +73,11 @@ program
 program
   .command('web')
   .description('Run the Discord-like web UI + REST + WebSocket server')
-  .option('--port <port>', 'port (default 7879)', '7879')
-  .option('--host <host>', 'bind host (default 127.0.0.1 — use 0.0.0.0 to expose)', '127.0.0.1')
+  .option('--port <port>', 'port (default: $DROIDRING_WEB_PORT or 7879)')
+  .option('--host <host>', 'bind host (default: $DROIDRING_WEB_HOST or 127.0.0.1)')
   .action(async (opts) => {
+    const port = Number(opts.port || process.env.DROIDRING_WEB_PORT || 7879);
+    const host = opts.host || process.env.DROIDRING_WEB_HOST || '127.0.0.1';
     const { buildContextAndServer, registerSession, maybeJoinRepoRoom } = await import(
       './mcp-runner.js'
     );
@@ -64,8 +89,8 @@ program
     const session = registerSession(repo, { client: 'web' });
     await maybeJoinRepoRoom(manager, session);
     const srv = await startWebServer({
-      host: opts.host,
-      port: Number(opts.port),
+      host,
+      port,
       manager,
       repo,
       token,
@@ -110,6 +135,192 @@ program
   .action(async (opts) => {
     const { startTui } = await import('../tui/app.js');
     await startTui({ daemonUrl: opts.daemon });
+  });
+
+/**
+ * Figure out the absolute path to the installed `droidring` binary so we can
+ * bake it into a cron entry. The value must survive shell-environment
+ * differences (cron has a minimal PATH), so we resolve the symlink to a
+ * canonical path before writing it.
+ */
+function resolveDroidringBin(): string {
+  if (process.env.DROIDRING_BIN && existsSync(process.env.DROIDRING_BIN)) {
+    return realpathSync(process.env.DROIDRING_BIN);
+  }
+  const which = spawnSync('which', ['droidring'], { encoding: 'utf8' });
+  if (which.status === 0) {
+    const path = which.stdout.trim();
+    if (path && existsSync(path)) return realpathSync(path);
+  }
+  // Fall back to argv[1] — the very process the user just invoked.
+  const entry = process.argv[1];
+  if (entry && existsSync(entry)) return realpathSync(entry);
+  return entry || 'droidring';
+}
+
+function formatHeartbeat(ts: number): string {
+  const age = Math.max(0, Date.now() - ts);
+  if (age < 60_000) return `${Math.round(age / 1000)}s ago`;
+  if (age < 3_600_000) return `${Math.round(age / 60_000)}m ago`;
+  return `${Math.round(age / 3_600_000)}h ago`;
+}
+
+program
+  .command('ensure')
+  .description(
+    'Internal: ensure the background droidring web daemon is alive. Invoked by the cron entry installed by `droidring service install`.',
+  )
+  .action(async () => {
+    await ensureDaemon(resolveDroidringBin());
+  });
+
+const serviceCmd = program
+  .command('service')
+  .description(
+    'Manage the persistent background service (keeps droidring running across sessions)',
+  );
+
+serviceCmd
+  .command('install')
+  .description('Install a cron entry so droidring web stays alive across terminal sessions')
+  .action(() => {
+    const bin = resolveDroidringBin();
+    if (!cronSupported()) {
+      process.stderr.write(
+        `crontab is not available on this platform. Run \`droidring web\` in a
+long-lived terminal, or use your OS service manager (launchd, systemd,
+Task Scheduler) to run:
+
+    ${bin} web
+`,
+      );
+      process.exit(1);
+    }
+    const r = installCron(bin);
+    if (!r.ok) {
+      process.stderr.write(`[droidring] service install failed: ${r.error}\n`);
+      process.exit(1);
+    }
+    process.stdout.write(
+      `[droidring] persistent service installed.
+  cron entry:   * * * * * ${bin} ensure
+  service log:  ${serviceLogPath()}
+  Run \`droidring service status\` to check, \`droidring service uninstall\` to remove.
+`,
+    );
+    // Kick off the first keeper immediately so the user doesn't wait up to
+    // a minute for cron to fire.
+    ensureDaemon(bin).catch(() => {});
+  });
+
+serviceCmd
+  .command('uninstall')
+  .description('Remove the cron entry. The running droidring web is left alone.')
+  .action(() => {
+    const r = uninstallCron();
+    if (!r.ok) {
+      process.stderr.write(`[droidring] service uninstall failed: ${r.error}\n`);
+      process.exit(1);
+    }
+    process.stdout.write(
+      '[droidring] persistent service removed.\n' +
+        '  The currently-running droidring web (if any) is still up.\n' +
+        '  Stop it manually with: droidring service status  (shows the pid)\n',
+    );
+  });
+
+serviceCmd
+  .command('status')
+  .description('Show the persistent service status and web URL')
+  .action(() => {
+    const s = serviceStatus();
+    process.stdout.write(`service running : ${s.running ? 'yes' : 'no'}\n`);
+    if (s.pid) process.stdout.write(`pid             : ${s.pid}\n`);
+    if (s.web_url) process.stdout.write(`web url         : ${s.web_url}\n`);
+    if (s.last_heartbeat) {
+      process.stdout.write(
+        `last heartbeat  : ${new Date(s.last_heartbeat).toISOString()} (${formatHeartbeat(
+          s.last_heartbeat,
+        )})\n`,
+      );
+    }
+    if (s.stale) process.stdout.write('                  (heartbeat is stale)\n');
+    if (!s.cron_supported) {
+      process.stdout.write('cron            : unsupported on this platform\n');
+    } else {
+      process.stdout.write(`cron installed  : ${s.cron_installed ? 'yes' : 'no'}\n`);
+    }
+    process.stdout.write(`service log     : ${serviceLogPath()}\n`);
+  });
+
+program
+  .command('launch')
+  .description(
+    'Start droidring web and open the best available interface (Electron, browser, or TUI)',
+  )
+  .option('--kind <kind>', 'Force a specific interface: electron | browser | tui | none', 'auto')
+  .option('--no-start', 'Assume a droidring server is already running — just open the UI')
+  .action(async (opts) => {
+    const requested = String(opts.kind || 'auto').toLowerCase();
+    if (!['auto', 'electron', 'browser', 'tui', 'none'].includes(requested)) {
+      process.stderr.write(`[droidring] unknown --kind '${requested}'\n`);
+      process.exit(2);
+    }
+
+    // TUI is inline — no server to start, it boots its own in-process manager.
+    if (requested === 'tui') {
+      const { startTui } = await import('../tui/app.js');
+      await startTui({});
+      return;
+    }
+
+    // For electron / browser / auto we want a running web server. Try to
+    // reuse one that's already up (service heartbeat or web-url file).
+    let url = readWebUrl();
+    if (!url && opts.start !== false) {
+      // Ensure / start a daemon, then poll for the URL.
+      await ensureDaemon(resolveDroidringBin());
+      for (let i = 0; i < 32 && !url; i++) {
+        await new Promise((r) => setTimeout(r, 250));
+        url = readWebUrl();
+      }
+    }
+    if (!url) {
+      process.stderr.write(
+        '[droidring] no running web server. Start one with `droidring web` or\n' +
+          '            install the persistent service (`droidring service install`).\n',
+      );
+      process.exit(1);
+    }
+
+    const caps = await detectShellCapabilities();
+    let kind: 'auto' | 'electron' | 'browser' | 'none' = 'auto';
+    if (requested === 'electron') {
+      if (!caps.electron_available) {
+        process.stderr.write(
+          '[droidring] electron is not installed. Install it with:\n' +
+            `            (cd "$(dirname "$(which droidring)")/../share/droidring" && npm i electron)\n` +
+            '            or re-run install.sh with DROIDRING_ELECTRON=1\n',
+        );
+        process.exit(1);
+      }
+      kind = 'electron';
+    } else if (requested === 'browser') {
+      kind = 'browser';
+    } else if (requested === 'none') {
+      kind = 'none';
+    }
+
+    const used = await launchShell(url, { kind });
+    if (used === 'none') {
+      process.stdout.write(`${url}\n`);
+      process.stdout.write(
+        '[droidring] no GUI available (headless / SSH). Open the URL above in your\n' +
+          '            browser, or run `droidring tui` for the console interface.\n',
+      );
+    } else {
+      process.stdout.write(`[droidring] opened via ${used}: ${url}\n`);
+    }
   });
 
 program
