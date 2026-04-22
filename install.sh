@@ -388,9 +388,12 @@ launch_web_or_electron() {
     return
   fi
 
-  mkdir -p "$HOME/.droidring"
-  WEB_URL_FILE="$HOME/.droidring/web-url"
-  WEB_LOG="$HOME/.droidring/web.log"
+  # Honour DROIDRING_HOME the same way the server does — otherwise an install
+  # run with `DROIDRING_HOME=/somewhere sh install.sh` polls the wrong file.
+  DATA_DIR="${DROIDRING_HOME:-$HOME/.droidring}"
+  mkdir -p "$DATA_DIR"
+  WEB_URL_FILE="$DATA_DIR/web-url"
+  WEB_LOG="$DATA_DIR/web.log"
 
   # If the persistent service is managing the daemon, don't spawn a duplicate
   # — just poll for the URL the service wrote.
