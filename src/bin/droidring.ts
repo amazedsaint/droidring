@@ -27,7 +27,7 @@ import {
 } from '../service/service.js';
 import { openDatabase } from '../store/db.js';
 import { Repo } from '../store/repo.js';
-import { detectShellCapabilities, launchShell } from '../web/launch-shell.js';
+import { LAUNCH_KINDS, type LaunchKind, launchShell } from '../web/launch-shell.js';
 import { readWebUrl } from '../web/url-file.js';
 import { buildContextAndServer, runHttpServer, runStdioServer } from './mcp-runner.js';
 
@@ -262,28 +262,24 @@ program
   .option('--no-start', 'Assume a droidring server is already running — just open the UI')
   .action(async (opts) => {
     const requested = String(opts.kind || 'auto').toLowerCase();
-    if (!['auto', 'electron', 'browser', 'tui', 'none'].includes(requested)) {
+    const valid = [...LAUNCH_KINDS, 'tui'];
+    if (!valid.includes(requested)) {
       process.stderr.write(`[droidring] unknown --kind '${requested}'\n`);
       process.exit(2);
     }
 
-    // TUI is inline — no server to start, it boots its own in-process manager.
+    // TUI boots its own in-process manager — no web server required.
     if (requested === 'tui') {
       const { startTui } = await import('../tui/app.js');
       await startTui({});
       return;
     }
 
-    // For electron / browser / auto we want a running web server. Try to
-    // reuse one that's already up (service heartbeat or web-url file).
+    // ensureDaemon() returns the URL it discovered, so we don't need to
+    // poll a second time after it returns.
     let url = readWebUrl();
     if (!url && opts.start !== false) {
-      // Ensure / start a daemon, then poll for the URL.
-      await ensureDaemon(resolveDroidringBin());
-      for (let i = 0; i < 32 && !url; i++) {
-        await new Promise((r) => setTimeout(r, 250));
-        url = readWebUrl();
-      }
+      url = await ensureDaemon(resolveDroidringBin());
     }
     if (!url) {
       process.stderr.write(
@@ -293,25 +289,14 @@ program
       process.exit(1);
     }
 
-    const caps = await detectShellCapabilities();
-    let kind: 'auto' | 'electron' | 'browser' | 'none' = 'auto';
-    if (requested === 'electron') {
-      if (!caps.electron_available) {
-        process.stderr.write(
-          '[droidring] electron is not installed. Install it with:\n' +
-            `            (cd "$(dirname "$(which droidring)")/../share/droidring" && npm i electron)\n` +
-            '            or re-run install.sh with DROIDRING_ELECTRON=1\n',
-        );
-        process.exit(1);
-      }
-      kind = 'electron';
-    } else if (requested === 'browser') {
-      kind = 'browser';
-    } else if (requested === 'none') {
-      kind = 'none';
+    const used = await launchShell(url, { kind: requested as LaunchKind });
+    if (used === 'none' && requested === 'electron') {
+      process.stderr.write(
+        '[droidring] electron is not installed. Re-run install.sh with\n' +
+          '            DROIDRING_ELECTRON=1, or fall back to `--kind browser`.\n',
+      );
+      process.exit(1);
     }
-
-    const used = await launchShell(url, { kind });
     if (used === 'none') {
       process.stdout.write(`${url}\n`);
       process.stdout.write(

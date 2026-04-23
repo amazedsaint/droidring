@@ -398,19 +398,31 @@ export function hasDisplay(): boolean {
   return !!(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
 }
 
+let _electronBin: Promise<string | null> | undefined;
 export async function resolveElectron(): Promise<string | null> {
   if (process.env.DROIDRING_FORCE_BROWSER === '1') return null;
-  try {
-    // Optional runtime dep — dynamic specifier keeps TS from resolving types
-    // at build time and keeps tsup from bundling electron into dist/.
-    const specifier = 'electron';
-    const mod: any = await import(specifier);
-    const bin = (typeof mod === 'string' ? mod : mod?.default) as string | undefined;
-    return bin && typeof bin === 'string' ? bin : null;
-  } catch {
-    return null;
+  // Memoize — `detectShellCapabilities` + `launchShell` are called back-to-back
+  // by the `launch` CLI, so we'd otherwise resolve the electron module twice.
+  if (!_electronBin) {
+    _electronBin = (async () => {
+      try {
+        // Dynamic specifier keeps TS from resolving types at build time and
+        // keeps tsup from bundling electron into dist/.
+        const specifier = 'electron';
+        const mod: any = await import(specifier);
+        const bin = (typeof mod === 'string' ? mod : mod?.default) as string | undefined;
+        return bin && typeof bin === 'string' ? bin : null;
+      } catch {
+        return null;
+      }
+    })();
   }
+  return _electronBin;
 }
+
+/** String-union of valid launch kinds. Shared by the library + the CLI. */
+export const LAUNCH_KINDS = ['auto', 'electron', 'browser', 'none'] as const;
+export type LaunchKind = (typeof LAUNCH_KINDS)[number];
 
 export interface ShellCapabilities {
   electron_available: boolean;
@@ -440,63 +452,67 @@ export function writeElectronShellFiles(): { main: string; preload: string } {
   return { main, preload };
 }
 
+/** Headless / CI / SSH gating for `kind: 'auto'`. Explicit kinds bypass this. */
+function canAutoOpen(): boolean {
+  if (process.env.DROIDRING_WEB_OPEN === '0') return false;
+  if (isOverSsh()) return false;
+  return hasDisplay();
+}
+
+function spawnElectron(url: string, electronBin: string, version?: string): boolean {
+  try {
+    const { main, preload } = writeElectronShellFiles();
+    const child = spawn(electronBin, [main, url], {
+      stdio: 'ignore',
+      detached: true,
+      env: {
+        ...process.env,
+        DROIDRING_PRELOAD: preload,
+        DROIDRING_VERSION: version || process.env.DROIDRING_VERSION || '0.0.0',
+        ELECTRON_NO_ATTACH_CONSOLE: '1',
+      },
+    });
+    child.on('error', () => {
+      /* swallow — caller decides whether to fall back */
+    });
+    child.unref();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Decide the best shell for the current platform/session and launch it.
- * Returns which kind was used so the caller can log appropriately. Always
- * non-blocking; Electron is spawned detached so it outlives this process.
+ * Returns which kind was actually used. Always non-blocking; Electron is
+ * spawned detached so it outlives this process.
  */
 export async function launchShell(
   url: string,
-  opts: { version?: string; kind?: 'auto' | 'electron' | 'browser' | 'none' } = {},
+  opts: { version?: string; kind?: LaunchKind } = {},
 ): Promise<ShellKind> {
   const kind = opts.kind ?? 'auto';
-  if (kind === 'none') return 'none';
-  // `auto` keeps the historical env-based gating so cron / headless installs
-  // never accidentally pop a window. A caller that explicitly requests a
-  // kind is assumed to know what they're doing — honour it.
-  if (kind === 'auto') {
-    if (process.env.DROIDRING_WEB_OPEN === '0') return 'none';
-    if (isOverSsh()) return 'none';
-    if (!hasDisplay()) return 'none';
-  }
-
-  if (kind === 'browser') {
-    tryOpenBrowser(url);
-    return 'browser';
-  }
-
-  const electronBin = kind === 'electron' || kind === 'auto' ? await resolveElectron() : null;
-  if (electronBin) {
-    try {
-      const { main, preload } = writeElectronShellFiles();
-      const child = spawn(electronBin, [main, url], {
-        stdio: 'ignore',
-        detached: true,
-        env: {
-          ...process.env,
-          DROIDRING_PRELOAD: preload,
-          DROIDRING_VERSION: opts.version || process.env.DROIDRING_VERSION || '0.0.0',
-          // Suppress Electron's own logging noise in the parent's stderr.
-          ELECTRON_NO_ATTACH_CONSOLE: '1',
-        },
-      });
-      child.on('error', () => {
-        /* swallow — browser fallback handled below */
-      });
-      child.unref();
-      return 'electron';
-    } catch {
-      // Electron crashed on spawn — only fall back if the caller was happy
-      // with any GUI ('auto'). An explicit electron request gets 'none'.
+  switch (kind) {
+    case 'none':
+      return 'none';
+    case 'browser':
+      tryOpenBrowser(url);
+      return 'browser';
+    case 'electron': {
+      const bin = await resolveElectron();
+      if (bin && spawnElectron(url, bin, opts.version)) return 'electron';
+      // Explicit electron request: don't silently fall back to a browser —
+      // the CLI picker surfaces 'none' as an error to the user.
+      return 'none';
+    }
+    case 'auto': {
+      if (!canAutoOpen()) return 'none';
+      const bin = await resolveElectron();
+      if (bin && spawnElectron(url, bin, opts.version)) return 'electron';
+      tryOpenBrowser(url);
+      return 'browser';
     }
   }
-
-  // Explicit electron-only request but Electron unavailable: don't
-  // silently reach for the browser; the CLI picker surfaces this.
-  if (kind === 'electron') return 'none';
-
-  tryOpenBrowser(url);
-  return 'browser';
 }
 
 /** Exposed for tests only. */

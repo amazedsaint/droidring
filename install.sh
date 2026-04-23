@@ -371,69 +371,25 @@ if [ "$on_path" -eq 0 ]; then
 fi
 
 # ---------- launch the chosen interface ----------
-launch_tui_instructions() {
-  printf '\n\033[1;36m==> To launch the TUI, open a fresh terminal and run:\033[0m\n'
-  printf '      \033[36m%s tui\033[0m\n' "$BIN_DIR/droidring"
-  printf '    (Ink needs a live TTY, so we don'"'"'t start it from the installer.)\n'
-}
-
-launch_web_or_electron() {
-  # $1 = "electron" | "web"  (both start `droidring web` under the hood;
-  # the Electron preference is read from DROIDRING_FORCE_BROWSER / DROIDRING_ELECTRON
-  # by the server when it calls launchShell())
-  target_kind="$1"
-
-  if [ "$on_path" -eq 0 ] && [ ! -x "$BIN_DIR/droidring" ]; then
-    printf '   (skipped — %s not on PATH, run \033[36mdroidring launch\033[0m yourself)\n' "$BIN_DIR"
-    return
-  fi
-
-  # Honour DROIDRING_HOME the same way the server does — otherwise an install
-  # run with `DROIDRING_HOME=/somewhere sh install.sh` polls the wrong file.
-  DATA_DIR="${DROIDRING_HOME:-$HOME/.droidring}"
-  mkdir -p "$DATA_DIR"
-  WEB_URL_FILE="$DATA_DIR/web-url"
-  WEB_LOG="$DATA_DIR/web.log"
-
-  # If the persistent service is managing the daemon, don't spawn a duplicate
-  # — just poll for the URL the service wrote.
-  if [ "${INSTALL_SERVICE:-0}" = "1" ]; then
-    printf '\033[1;36m==> Starting droidring via persistent service…\033[0m\n'
-  else
-    printf '\033[1;36m==> Starting droidring web…\033[0m\n'
-    rm -f "$WEB_URL_FILE"
-    # DROIDRING_WEB_OPEN=0: the CLI itself decides when to open a shell via
-    # our `droidring launch` call below — don't let the server double-launch.
-    DROIDRING_WEB_OPEN=0 nohup "$BIN_DIR/droidring" web >"$WEB_LOG" 2>&1 &
-    SRV_PID=$!
-  fi
-
-  printf '   (waiting for server to start…)\n'
-  i=0
-  while [ "$i" -lt 40 ]; do
-    [ -r "$WEB_URL_FILE" ] && break
-    [ "${INSTALL_SERVICE:-0}" = "1" ] || kill -0 "$SRV_PID" 2>/dev/null || break
-    sleep 0.25
-    i=$((i + 1))
-  done
-
-  if [ ! -r "$WEB_URL_FILE" ]; then
-    printf '   \033[1;33m!\033[0m server did not write %s within 10 s\n' "$WEB_URL_FILE"
-    printf '     tail of log (%s):\n' "$WEB_LOG"
-    tail -n 10 "$WEB_LOG" 2>/dev/null | sed 's/^/       /'
-    printf '     Retry with \033[36mdroidring launch\033[0m and check the banner it prints.\n'
-    return
-  fi
-
-  # Delegate to the CLI launcher — it knows how to pick Electron vs browser
-  # and prints the URL if neither is available.
-  "$BIN_DIR/droidring" launch --kind "$target_kind" --no-start \
-    || printf '   (Could not launch automatically — open the URL from %s yourself.)\n' "$WEB_URL_FILE"
-}
-
+# The CLI's `droidring launch` already knows how to (a) reuse a running
+# daemon via the web-url file, (b) spawn `droidring web` via ensureDaemon
+# when nothing is running, (c) pick Electron vs browser. The installer
+# just picks a kind and delegates — no manual spawn + poll needed here.
 case "${LAUNCH_KIND:-none}" in
-  electron) launch_web_or_electron electron ;;
-  web)      launch_web_or_electron browser ;;
-  tui)      launch_tui_instructions ;;
-  none|"")  : ;;
+  electron|web)
+    if [ "$on_path" -eq 0 ] && [ ! -x "$BIN_DIR/droidring" ]; then
+      printf '   (skipped — %s not on PATH, run \033[36mdroidring launch\033[0m yourself)\n' "$BIN_DIR"
+    else
+      [ "$LAUNCH_KIND" = "web" ] && CLI_KIND=browser || CLI_KIND=electron
+      printf '\n\033[1;36m==> Starting droidring…\033[0m\n'
+      "$BIN_DIR/droidring" launch --kind "$CLI_KIND" \
+        || printf '   (Launch failed — try \033[36mdroidring launch\033[0m manually.)\n'
+    fi
+    ;;
+  tui)
+    printf '\n\033[1;36m==> To launch the TUI, open a fresh terminal and run:\033[0m\n'
+    printf '      \033[36m%s tui\033[0m\n' "$BIN_DIR/droidring"
+    printf '    (Ink needs a live TTY, so we don'"'"'t start it from the installer.)\n'
+    ;;
+  none|"") : ;;
 esac

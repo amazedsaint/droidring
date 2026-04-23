@@ -57,6 +57,20 @@ export function droidringDir(): string {
   return dir;
 }
 
+/**
+ * Write a secret (token, URL, heartbeat) under droidringDir with best-effort
+ * 0600 permissions. Windows filesystems ignore chmod — the parent dir is
+ * still in the user's home, which is our last line of defence there.
+ */
+export function writeSecretFile(path: string, contents: string): void {
+  writeFileSync(path, contents);
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    /* non-POSIX fs */
+  }
+}
+
 export function identityPath(): string {
   return join(droidringDir(), 'identity.json');
 }

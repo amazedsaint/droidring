@@ -1,6 +1,6 @@
-import { chmodSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { droidringDir } from '../p2p/identity.js';
+import { droidringDir, writeSecretFile } from '../p2p/identity.js';
 
 /**
  * Persist the current web UI URL (including the token fragment) to a
@@ -14,16 +14,8 @@ export function webUrlPath(): string {
 }
 
 export function writeWebUrl(url: string): void {
-  const path = webUrlPath();
-  writeFileSync(path, `${url}\n`);
-  // Same posture as web-token: the URL embeds the token, so protect it
-  // the same way.
-  try {
-    chmodSync(path, 0o600);
-  } catch {
-    // Windows filesystems don't honour chmod — the file is still in the
-    // user's home, which is the strongest defence we have there.
-  }
+  // The URL embeds the auth token, so it's secret — 0600 like web-token.
+  writeSecretFile(webUrlPath(), `${url}\n`);
 }
 
 export function readWebUrl(): string | null {

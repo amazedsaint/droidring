@@ -17,9 +17,10 @@
  * suggestion instead.
  */
 import { type SpawnSyncReturns, spawn, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, openSync, readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { droidringDir } from '../p2p/identity.js';
+import { droidringDir, writeSecretFile } from '../p2p/identity.js';
+import { readWebUrl } from '../web/url-file.js';
 
 const CRON_MARK = '# droidring persistent service (added by `droidring service install`)';
 const CRON_SCHEDULE = '* * * * *';
@@ -62,13 +63,7 @@ export function writeHeartbeat(data: { pid: number; web_url?: string; started_at
     started_at,
     last_heartbeat: now,
   };
-  const p = heartbeatPath();
-  writeFileSync(p, JSON.stringify(hb, null, 2));
-  try {
-    chmodSync(p, 0o600);
-  } catch {
-    /* Windows — no chmod */
-  }
+  writeSecretFile(heartbeatPath(), `${JSON.stringify(hb, null, 2)}\n`);
 }
 
 export function readHeartbeat(): ServiceHeartbeat | null {
@@ -103,10 +98,16 @@ export function isProcessAlive(pid: number): boolean {
 
 // ---------- cron handling ----------
 
+let _cronSupported: boolean | undefined;
 export function cronSupported(): boolean {
-  if (process.platform === 'win32') return false;
-  const r = spawnSync('which', ['crontab'], { encoding: 'utf8' });
-  return r.status === 0 && r.stdout.trim().length > 0;
+  if (_cronSupported !== undefined) return _cronSupported;
+  if (process.platform === 'win32') {
+    _cronSupported = false;
+  } else {
+    const r = spawnSync('which', ['crontab'], { encoding: 'utf8' });
+    _cronSupported = r.status === 0 && r.stdout.trim().length > 0;
+  }
+  return _cronSupported;
 }
 
 function runCrontab(args: string[], input?: string): SpawnSyncReturns<string> {
@@ -137,12 +138,8 @@ export function installCron(droidringBin: string): { ok: boolean; error?: string
   if (!cronSupported()) {
     return { ok: false, error: 'crontab not available on this platform' };
   }
-  if (!existsSync(droidringBin)) {
-    return { ok: false, error: `binary not found: ${droidringBin}` };
-  }
   const lines = readCrontab();
   if (lines.some((l) => l.includes(CRON_MARK))) return { ok: true };
-  // Trim trailing blanks so the file stays tidy.
   while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
   lines.push(...droidringCronLines(droidringBin));
   const ok = writeCrontab(lines);
@@ -211,46 +208,39 @@ export function serviceStatus(): ServiceStatus {
  * the heartbeat. Otherwise, spawn `droidring web` detached, wait briefly
  * for it to publish its URL, and record the new pid.
  *
+ * Returns the current web URL (if known) so CLI callers like
+ * `droidring launch` don't have to repeat the poll.
+ *
  * Never throws — cron swallows output. Logs to service.log via the redirect
  * the cron entry sets up.
  */
-export async function ensureDaemon(droidringBin: string): Promise<void> {
+export async function ensureDaemon(droidringBin: string): Promise<string | null> {
   const hb = readHeartbeat();
   if (hb && isProcessAlive(hb.pid)) {
-    // pid is alive — just re-stamp, regardless of how old the last beat
-    // was. A stale beat on a live pid just means cron hasn't fired for a
-    // while (e.g. system asleep); respawning would collide on the port.
+    // Live pid: re-stamp regardless of beat age. A stale beat on a live pid
+    // just means cron hasn't fired for a while; respawning would collide
+    // on the port.
     writeHeartbeat({ pid: hb.pid, web_url: hb.web_url, started_at: hb.started_at });
-    return;
+    return hb.web_url ?? null;
   }
-  // Dead / missing — reap so the new pid doesn't cling to old URL.
   clearHeartbeat();
 
-  if (!existsSync(droidringBin)) {
-    // Nothing we can do — cron entry will try again in a minute.
-    return;
-  }
-
-  const logPath = serviceLogPath();
-  const out = openSync(logPath, 'a');
+  const out = openSync(serviceLogPath(), 'a');
   const child = spawn(droidringBin, ['web'], {
     detached: true,
     stdio: ['ignore', out, out],
-    env: {
-      ...process.env,
-      // The persistent service runs headlessly — don't attempt to pop an
-      // Electron window from cron (no GUI session anyway).
-      DROIDRING_WEB_OPEN: '0',
-    },
+    // Headless cron — don't try to pop an Electron window.
+    env: { ...process.env, DROIDRING_WEB_OPEN: '0' },
   });
+  // Parent's fd is independent of the child's dup — close ours so long-lived
+  // callers (e.g. `droidring service install` → ensureDaemon) don't leak it.
+  closeSync(out);
   child.unref();
   const pid = child.pid;
-  if (!pid) return;
+  if (!pid) return null;
 
-  // Wait up to ~8s for the server to publish its URL so the first
-  // heartbeat includes it. Poll the web-url file rather than opening
-  // a socket — the path is authoritative and cheap to stat.
-  const { readWebUrl } = await import('../web/url-file.js');
+  // Poll the web-url file rather than the socket — the path is authoritative
+  // and cheap to stat. Bail early if the child dies.
   let url: string | null = null;
   for (let i = 0; i < 32; i++) {
     url = readWebUrl();
@@ -259,4 +249,5 @@ export async function ensureDaemon(droidringBin: string): Promise<void> {
     if (!isProcessAlive(pid)) break;
   }
   writeHeartbeat({ pid, web_url: url || undefined, started_at: Date.now() });
+  return url;
 }

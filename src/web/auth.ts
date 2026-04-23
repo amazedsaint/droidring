@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { droidringDir } from '../p2p/identity.js';
+import { droidringDir, writeSecretFile } from '../p2p/identity.js';
 
 /**
  * The web UI authenticates every request with a Bearer token. The token is
@@ -23,8 +23,7 @@ export function loadOrCreateToken(): string {
     if (e.code !== 'ENOENT') throw e;
   }
   const token = randomBytes(32).toString('hex');
-  writeFileSync(path, `${token}\n`);
-  chmodSync(path, 0o600);
+  writeSecretFile(path, `${token}\n`);
   return token;
 }
 
